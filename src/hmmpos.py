@@ -1,3 +1,9 @@
+import argparse
+
+parser = argparse.ArgumentParser(description='Annotate a sentence with part-of-speech tags.')
+parser.add_argument('--input_file', type=str)
+parser.add_argument('--n', type=int)
+args = parser.parse_args()
 
 """
 model = set of n-gram models
@@ -20,16 +26,14 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
         B[(tag, igram)] = 1 if (not ((tag, igram) in B)) else B[(tag, igram)] + 1 
     return (Q, A, B, ngram, tag)
 
-input_file = "dataset/dev.conll"
 Q = {}
 A = {}
 B = {}
-n = 2
 ngram = ()
 last_tag = ""
 
 # https://docs.python.org/3/library/functions.html#open
-with open(input_file) as fp:
+with open(args.input_file) as fp:
     for line in iter(fp.readline, ''):
         line = line.strip()
         if len(line) == 0:
@@ -37,7 +41,7 @@ with open(input_file) as fp:
             last_tag = ""
         else:
             (word, lang, tag) = tuple(line.split('\t')[0:3])
-            (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag)
+            (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, args.n, ngram, last_tag, word, lang, tag)
 
 print("***** Q *****")
 for q in Q:
