@@ -1,5 +1,6 @@
 import argparse
 #import functools
+from itertools import product
 
 """
 Command-line arguments
@@ -12,6 +13,12 @@ args = parser.parse_args()
 
 TAG_Q0 = "Q0"
 TAG_QF = "QF"
+
+# From http://universaldependencies.org/u/pos/
+TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
+          'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM',
+          'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ',
+          'SYM', 'VERB', 'X', TAG_QF]
 
 """
 Update frequency model with observation and concomitant state annotation.
@@ -58,10 +65,10 @@ def freqs_to_probs(QABn):
 Build model of frequencies from annotated file.
 """
 def freqs_from_file(input_file, n):
-    # Initialize state counts with start and end state counts set to zero.
-    Q = { (TAG_Q0,1) : 0, (TAG_QF,1) : 0 }
-    # Initialize transition frequencies to empty dictionary.
-    A = {}
+    # Initialize state counts with Laplace smoothing.
+    Q = { (q, i) : 1 for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
+    # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing). 
+    A = { qq : 1 for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies to empty dictionary.
     B = {}
     # Initialize ngram cursor to empty tuple.
