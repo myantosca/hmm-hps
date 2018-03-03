@@ -24,6 +24,8 @@ TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
           'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ',
           'SYM', 'VERB', 'X', 'UNK', TAG_QF]
 
+CLOSED_TAGS = ['ADP', 'AUX', 'CCONJ', 'DET', 'NUM', 'PART', 'PRON', 'SCONJ']
+
 """
 Update frequency model with observation and concomitant state annotation.
 """
@@ -42,7 +44,9 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
         # Increment population count of tag respective the observation igram size.
         Q[(tag, isize)] = 1 if (not ((tag, isize) in Q)) else Q[(tag, isize)] + 1
         # Add count to emission probability matrix.
-        B[(tag, igram)] = 1 if (not ((tag, igram) in B)) else B[(tag, igram)] + 1 
+        B[(tag, igram)] = 1 if (not ((tag, igram) in B)) else B[(tag, igram)] + 1
+        #for q in TAGSET:
+        #    B[(q, igram[:isize-1] + ((WORD_UNK, LANG_UNK),))] = 0
     return (Q, A, B, ngram, tag)
 
 
@@ -55,7 +59,8 @@ def freqs_to_probs(QABnk):
     V = len([(t,g) for (t,g) in B.keys() if len(g) == 1])
     # Calculate emission probabilities from n-gram counts and state counts.
     for (tag, igram) in [(tag, igram) for (tag, igram) in B.keys() if (tag != TAG_Q0 and tag != TAG_QF)]:
-        B[(tag, igram)] = (B[(tag, igram)] + k) / (Q[(tag, len(igram))] + k*V)
+        isize = len(igram)
+        B[(tag, igram)] = (B[(tag, igram)] + k) / (Q[(tag, isize)] + k*V)
     # Calculate transition probabilities from state transition counts and state counts.
     for (tag1, tag2) in A.keys():
         A[(tag1, tag2)] = A[(tag1, tag2)] / Q[(tag1, 1)]
@@ -77,6 +82,12 @@ def freqs_from_file(input_file, n, k):
     A = { qq : k for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies with Laplace smoothing for unknown words.
     B = { (q, ((WORD_UNK, LANG_UNK),)) : 0 for q in TAGSET }
+    # for q in TAGSET:
+    #     for i in [i+1 for i in range(n)]:
+    #         igram = ()
+    #         for j in range(i):
+    #             igram += ((WORD_UNK, LANG_UNK),)
+    #         B[(q,igram)] = 0
     # Initialize ngram cursor to empty tuple.
     ngram = ()
     # Initialize last tag to start state.
@@ -108,13 +119,39 @@ def freqs_from_file(input_file, n, k):
     return (Q,A,B,n,k)
 
 def observation_fallback(B,s,o,n):
-    if re.match('^[A-Z][a-z]*$', o[n-1][0]) and s != 'PROPN':
+    if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
+        return 0
+    elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'PUNCT':
+        return 0
+    elif re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s == 'SYM':
+        return 0
+    elif s in CLOSED_TAGS:
         return 0
     else:
-        if re.match('^[^A-z0-9]+$', o[n-1][0]) and s != 'PUNCT':
-            return 0
-        else:
-            return B[(s,((WORD_UNK,LANG_UNK),))]
+        return B[(s, ((WORD_UNK,LANG_UNK),))]
+
+def observation_composite(B,s,ngram,t):
+    weight = 1.0
+    result = 0.0
+    n = len(ngram)
+    for i in range(n):
+        igram = ngram[i:]
+        isize = len(igram)
+        if isize <= t:
+            if (i < n - 1):
+                weight = weight - weight / 2.0
+            result += weight * B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram, isize)
+    return result
+
+
+def observation_backoff(B,s,ngram):
+    if len(ngram) == 0:
+        return 0
+    elif len(ngram) == 1:
+        return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1)
+    else:
+        return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:]) 
+
 """
 Perform a Viterbi decoding given an observation sequence and a HMM.
 """
@@ -128,7 +165,7 @@ def viterbi_decode(QABnk, O):
     viterbi = {}
     backptr = {}
     for s in Q:
-        b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],n)
+        b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],1)
         a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else 0
         #print("s = {}, a = {}, b = {}, O[0] = {}".format(s,a,b,O[0]))
         viterbi[(s,1)] = a * b
@@ -139,7 +176,7 @@ def viterbi_decode(QABnk, O):
         #print("o = {}".format(o))
         if (len(ngram) == n):
             ngram = ngram[1:]
-        ngram += (o,)
+        ngram += o
         for s in Q:
             amax = 0
             viterbi[(s,t)] = 0
@@ -147,7 +184,9 @@ def viterbi_decode(QABnk, O):
             for r in Q:
                 x = A[(r,s)] if (r,s) in A else 0
                 a = viterbi[(r,t-1)] * x
-                b = B[(s,o)] if (s,o) in B else observation_fallback(B,s,o,n)
+                #b = B[(s,o)] if (s,o) in B else observation_fallback(B,s,o,n)
+                b = observation_composite(B, s, ngram, t)
+                #b = observation_backoff(B, s, ngram)
                 #print("r = {}, s = {}, x = {}, a = {}, amax = {}, b = {}".format(r,s,x,a,amax,b))
                 viterbi[(s,t)] = max(viterbi[(s,t)], a * b)
                 if (a > amax):
