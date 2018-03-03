@@ -134,7 +134,7 @@ def viterbi_decode(QABn, O):
     viterbi[(TAG_QF, t)] = 0
     for s in Q:
         a = A[(s,TAG_QF)] if (s, TAG_QF) in A else 0
-        print("s = {}, a = {}, viterbi[(s,t-1)] = {}".format(s,a, viterbi[(s,t-1)]))
+        #print("s = {}, a = {}, viterbi[(s,t-1)] = {}".format(s,a, viterbi[(s,t-1)]))
         if (a * viterbi[(s, t-1)] > viterbi[(TAG_QF, t)]):
             viterbi[(TAG_QF, t)] = a
             backptr[(TAG_QF, t)] = s
@@ -159,11 +159,15 @@ def test_model(model, test_file):
             
             # End of sentence
             if len(line) == 0:
-                print(observations)
+                #print(observations)
                 tags = viterbi_decode(model, observations)
-                for entry in zip(observations, tags):
-                    print(entry)
-                    #print("{0}\t{1}\t{2}".format(entry[0][0], entry[0][1], entry[1][0]))
+                for result in zip(observations, tags):
+                    #print(result)
+                    word = result[0][0][0]
+                    lang = result[0][0][1]
+                    tag  = result[1]
+                    print("{0}\t{1}\t{2}".format(word, lang, tag))
+                print("")
                 observations = []
             else:
                 observations.append((tuple(line.split('\t')[0:2]),))
