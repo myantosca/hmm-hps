@@ -1,6 +1,7 @@
 import argparse
 #import functools
 from itertools import product
+import re
 
 """
 Command-line arguments
@@ -9,16 +10,19 @@ parser = argparse.ArgumentParser(description='Annotate a sentence with part-of-s
 parser.add_argument('--training_file', type=str)
 parser.add_argument('--test_file', type=str)
 parser.add_argument('--n', type=int)
+parser.add_argument('--k', type=float)
 args = parser.parse_args()
 
 TAG_Q0 = "Q0"
 TAG_QF = "QF"
+WORD_UNK = "<UNK>"
+LANG_UNK = "eng&spa"
 
 # From http://universaldependencies.org/u/pos/
 TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
           'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM',
           'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ',
-          'SYM', 'VERB', 'X', TAG_QF]
+          'SYM', 'VERB', 'X', 'UNK', TAG_QF]
 
 """
 Update frequency model with observation and concomitant state annotation.
@@ -45,13 +49,15 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
 """
 Convert model of frequencies to probabilities.
 """
-def freqs_to_probs(QABn):
-    (Q,A,B,n) = QABn
+def freqs_to_probs(QABnk):
+    (Q,A,B,n,k) = QABnk
+    # Determine the size of the 1-gram vocabulary.
+    V = len([(t,g) for (t,g) in B.keys() if len(g) == 1])
     # Calculate emission probabilities from n-gram counts and state counts.
-    for (tag, igram) in B:
-        B[(tag, igram)] = B[(tag, igram)] / Q[(tag, len(igram))]
+    for (tag, igram) in [(tag, igram) for (tag, igram) in B.keys() if (tag != TAG_Q0 and tag != TAG_QF)]:
+        B[(tag, igram)] = (B[(tag, igram)] + k) / (Q[(tag, len(igram))] + k*V)
     # Calculate transition probabilities from state transition counts and state counts.
-    for (tag1, tag2) in A:
+    for (tag1, tag2) in A.keys():
         A[(tag1, tag2)] = A[(tag1, tag2)] / Q[(tag1, 1)]
     # q_count = functools.reduce(lambda x,y: x+y, Q.values()) - Q[(TAG_Q0,1)] - Q[(TAG_QF,i)]
     #     if q_count != 0:
@@ -59,18 +65,18 @@ def freqs_to_probs(QABn):
     #             if tag != TAG_Q0 and tag != TAG_QF:
     #                 Q[(tag,j] = Q[tag]/q_count
     Q = [q for (q,i) in Q if i == 1]
-    return (Q,A,B,n)
+    return (Q,A,B,n,k)
 
 """
 Build model of frequencies from annotated file.
 """
-def freqs_from_file(input_file, n):
+def freqs_from_file(input_file, n, k):
     # Initialize state counts with Laplace smoothing.
-    Q = { (q, i) : 1 for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
+    Q = { (q, i) : k for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
     # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing). 
-    A = { qq : 1 for qq in product(TAGSET, TAGSET) }
-    # Initialize emission frequencies to empty dictionary.
-    B = {}
+    A = { qq : k for qq in product(TAGSET, TAGSET) }
+    # Initialize emission frequencies with Laplace smoothing for unknown words.
+    B = { (q, ((WORD_UNK, LANG_UNK),)) : 0 for q in TAGSET }
     # Initialize ngram cursor to empty tuple.
     ngram = ()
     # Initialize last tag to start state.
@@ -99,29 +105,41 @@ def freqs_from_file(input_file, n):
         if last_tag != TAG_Q0:
             (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, None, None, TAG_QF)
     # Return a model of counts.
-    return (Q,A,B,n)
+    return (Q,A,B,n,k)
 
+def observation_fallback(B,s,o,n):
+    if re.match('^[^A-Z][a-z]*$', o[n-1][0]) and s != 'PROPN':
+        return 0
+    else:
+        if re.match('^[^A-z0-9]+$', o[n-1][0]) and s != 'PUNCT':
+            return 0
+        else:
+            return B[(s,((WORD_UNK,LANG_UNK),))]
 """
 Perform a Viterbi decoding given an observation sequence and a HMM.
 """
-def viterbi_decode(QABn, O):
+def viterbi_decode(QABnk, O):
     # Return the base case for an empty list of observations.
     if len(O) == 0:
         return [TAG_Q0, TAG_QF]
-    (Q,A,B,n) = QABn
-    Q = [q for q in Q if q != TAG_QF]
+    (Q,A,B,n,k) = QABnk
+    Q = [q for q in Q if q != TAG_QF and q != TAG_Q0]
     # Initialization of trellis.
     viterbi = {}
     backptr = {}
     for s in Q:
-        b = B[(s,O[0])] if (s,O[0]) in B else 0
+        b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],n)
         a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else 0
         #print("s = {}, a = {}, b = {}, O[0] = {}".format(s,a,b,O[0]))
         viterbi[(s,1)] = a * b
         backptr[(s,1)] = TAG_Q0
     t = 2
+    ngram = O[0]
     for o in O[1:]:
         #print("o = {}".format(o))
+        if (len(ngram) == n):
+            ngram = ngram[1:]
+        ngram += (o,)
         for s in Q:
             amax = 0
             viterbi[(s,t)] = 0
@@ -129,8 +147,8 @@ def viterbi_decode(QABn, O):
             for r in Q:
                 x = A[(r,s)] if (r,s) in A else 0
                 a = viterbi[(r,t-1)] * x
-                b = B[(s,o)] if (s,o) in B else 0
-                #print("r = {}, s = {}, x = {}, a = {}, b = {}".format(r,s,x,a,b))
+                b = B[(s,o)] if (s,o) in B else observation_fallback(B,s,o,n)
+                #print("r = {}, s = {}, x = {}, a = {}, amax = {}, b = {}".format(r,s,x,a,amax,b))
                 viterbi[(s,t)] = max(viterbi[(s,t)], a * b)
                 if (a > amax):
                     #print("amax = {}".format(a))
@@ -179,16 +197,16 @@ def test_model(model, test_file):
             else:
                 observations.append((tuple(line.split('\t')[0:2]),))
 
-def train_model(training_file, n):
-    return freqs_to_probs(freqs_from_file(training_file, n))
+def train_model(training_file, n, k):
+    return freqs_to_probs(freqs_from_file(training_file, n, k))
         
 """
 main
 """
 
-model = train_model(args.training_file, args.n)
+model = train_model(args.training_file, args.n, args.k)
 
-#(Q,A,B,n) = model
+# (Q,A,B,n,k) = model
 # print("***** Q *****")
 # print("{0}".format(Q))
 # print("***** A *****\n")
