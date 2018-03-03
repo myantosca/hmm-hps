@@ -108,7 +108,7 @@ def freqs_from_file(input_file, n, k):
     return (Q,A,B,n,k)
 
 def observation_fallback(B,s,o,n):
-    if re.match('^[^A-Z][a-z]*$', o[n-1][0]) and s != 'PROPN':
+    if re.match('^[A-Z][a-z]*$', o[n-1][0]) and s != 'PROPN':
         return 0
     else:
         if re.match('^[^A-z0-9]+$', o[n-1][0]) and s != 'PUNCT':
