@@ -1,11 +1,12 @@
 import argparse
-import functools
+#import functools
 
 """
 Command-line arguments
 """
 parser = argparse.ArgumentParser(description='Annotate a sentence with part-of-speech tags.')
-parser.add_argument('--input_file', type=str)
+parser.add_argument('--training_file', type=str)
+parser.add_argument('--test_file', type=str)
 parser.add_argument('--n', type=int)
 args = parser.parse_args()
 
@@ -21,13 +22,14 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
         ngram = ngram[1:]
     # No emissions if tag is initial or final state.
     ngram = ngram + ((word, lang),) if (tag != TAG_Q0 and tag != TAG_QF) else ()
-    # Increment population count of tag.
-    Q[tag] = 1 if (not (tag in Q)) else Q[tag] + 1
     # Increment count of last_tag -> tag in transition probability matrix.
     A[(last_tag, tag)] = 1 if not ((last_tag, tag) in A) else A[(last_tag, tag)] + 1
     # update n-gram counts for all orders of n-gram
     for i in range(len(ngram)):
         igram = ngram[i:]
+        isize = len(igram)
+        # Increment population count of tag respective the observation igram size.
+        Q[(tag, isize)] = 1 if (not ((tag, isize) in Q)) else Q[(tag, isize)] + 1
         # Add count to emission probability matrix.
         B[(tag, igram)] = 1 if (not ((tag, igram) in B)) else B[(tag, igram)] + 1 
     return (Q, A, B, ngram, tag)
@@ -36,27 +38,28 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
 """
 Convert model of frequencies to probabilities.
 """
-def freqs_to_probs(QAB):
-    (Q,A,B) = QAB
+def freqs_to_probs(QABn):
+    (Q,A,B,n) = QABn
     # Calculate emission probabilities from n-gram counts and state counts.
     for (tag, igram) in B:
-        B[(tag, igram)] = B[(tag, igram)] / Q[tag]
+        B[(tag, igram)] = B[(tag, igram)] / Q[(tag, len(igram))]
     # Calculate transition probabilities from state transition counts and state counts.
     for (tag1, tag2) in A:
-        A[(tag1, tag2)] = A[(tag1, tag2)] / Q[tag1]
-    q_count = functools.reduce(lambda x,y: x+y, Q.values()) - Q[TAG_Q0] - Q[TAG_QF]
-    if q_count != 0:
-        for tag in Q:
-            if tag != TAG_Q0 and tag != TAG_QF:
-                Q[tag] = Q[tag]/q_count
-    return (Q,A,B)
+        A[(tag1, tag2)] = A[(tag1, tag2)] / Q[(tag1, 1)]
+    # q_count = functools.reduce(lambda x,y: x+y, Q.values()) - Q[(TAG_Q0,1)] - Q[(TAG_QF,i)]
+    #     if q_count != 0:
+    #         for (tag,j) in Q:
+    #             if tag != TAG_Q0 and tag != TAG_QF:
+    #                 Q[(tag,j] = Q[tag]/q_count
+    Q = [q for (q,i) in Q if i == 1]
+    return (Q,A,B,n)
 
 """
 Build model of frequencies from annotated file.
 """
 def freqs_from_file(input_file, n):
     # Initialize state counts with start and end state counts set to zero.
-    Q = { TAG_Q0 : 0, TAG_QF : 0 }
+    Q = { (TAG_Q0,1) : 0, (TAG_QF,1) : 0 }
     # Initialize transition frequencies to empty dictionary.
     A = {}
     # Initialize emission frequencies to empty dictionary.
@@ -72,7 +75,7 @@ def freqs_from_file(input_file, n):
             # End of sentence
             if len(line) == 0:
                 # Count matching start state
-                Q[TAG_Q0] += 1
+                Q[(TAG_Q0, 1)] += 1
                 # Update model for end of sentence
                 (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, None, None, TAG_QF)
                 # Reset ngram cursor
@@ -89,20 +92,100 @@ def freqs_from_file(input_file, n):
         if last_tag != TAG_Q0:
             (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, None, None, TAG_QF)
     # Return a model of counts.
-    return (Q,A,B)
+    return (Q,A,B,n)
 
+"""
+Perform a Viterbi decoding given an observation sequence and a HMM.
+"""
+def viterbi_decode(QABn, O):
+    # Return the base case for an empty list of observations.
+    if len(O) == 0:
+        return [TAG_Q0, TAG_QF]
+    (Q,A,B,n) = QABn
+    Q = [q for q in Q if q != TAG_QF]
+    # Initialization of trellis.
+    viterbi = {}
+    backptr = {}
+    for s in Q:
+        b = B[(s,O[0])] if (s,O[0]) in B else 0
+        a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else 0
+        #print("s = {}, a = {}, b = {}, O[0] = {}".format(s,a,b,O[0]))
+        viterbi[(s,1)] = a * b
+        backptr[(s,1)] = TAG_Q0
+    t = 2
+    for o in O[1:]:
+        #print("o = {}".format(o))
+        for s in Q:
+            amax = 0
+            viterbi[(s,t)] = 0
+            #backptr[(s,t)] = TAG_Q0
+            for r in Q:
+                x = A[(r,s)] if (r,s) in A else 0
+                a = viterbi[(r,t-1)] * x
+                b = B[(s,o)] if (s,o) in B else 0
+                #print("r = {}, s = {}, x = {}, a = {}, b = {}".format(r,s,x,a,b))
+                viterbi[(s,t)] = max(viterbi[(s,t)], a * b)
+                if (a > amax):
+                    #print("amax = {}".format(a))
+                    backptr[(s,t)] = r
+                    amax = a
+        t += 1
+
+    viterbi[(TAG_QF, t)] = 0
+    for s in Q:
+        a = A[(s,TAG_QF)] if (s, TAG_QF) in A else 0
+        print("s = {}, a = {}, viterbi[(s,t-1)] = {}".format(s,a, viterbi[(s,t-1)]))
+        if (a * viterbi[(s, t-1)] > viterbi[(TAG_QF, t)]):
+            viterbi[(TAG_QF, t)] = a
+            backptr[(TAG_QF, t)] = s
+
+    return walk_backpointers(backptr, (TAG_QF, t))
+
+def walk_backpointers(backptr, cursor):
+    (tag,t) = cursor
+    if (t <= 0):
+        return []
+    else:
+        result = walk_backpointers(backptr, (backptr[(tag,t)], t-1))
+        result.append(tag)
+        return result
+    
+
+def test_model(model, test_file):
+    with open(test_file) as fp:
+        observations = []
+        for line in iter(fp.readline, ''):
+            line = line.strip()
+            
+            # End of sentence
+            if len(line) == 0:
+                print(observations)
+                tags = viterbi_decode(model, observations)
+                for entry in zip(observations, tags):
+                    print(entry)
+                    #print("{0}\t{1}\t{2}".format(entry[0][0], entry[0][1], entry[1][0]))
+                observations = []
+            else:
+                observations.append((tuple(line.split('\t')[0:2]),))
+
+def train_model(training_file, n):
+    return freqs_to_probs(freqs_from_file(training_file, n))
+        
 """
 main
 """
 
-(Q,A,B) = freqs_to_probs(freqs_from_file(args.input_file, args.n))
+model = train_model(args.training_file, args.n)
 
-print("***** Q *****")
-for q in Q:
-    print("Q[{0}] = {1}".format(q, Q[q]))
-print("***** A *****\n")
-for a in A:
-    print("A[{0}] = {1}".format(a, A[a]))
-print("***** B *****\n")
-for b in B:
-    print("B[{0}] = {1}".format(b, B[b]))
+#(Q,A,B,n) = model
+# print("***** Q *****")
+# print("{0}".format(Q))
+# print("***** A *****\n")
+# for a in A:
+#     print("A[{0}] = {1}".format(a, A[a]))
+# print("***** B *****\n")
+# for b in B:
+#     print("B[{0}] = {1}".format(b, B[b]))
+
+test_model(model, args.test_file)
+
