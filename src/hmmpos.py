@@ -52,7 +52,6 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
         #    B[(q, igram[:isize-1] + ((WORD_UNK, LANG_UNK),))] = 0
     return (Q, A, B, ngram, tag)
 
-
 """
 Convert model of frequencies to probabilities.
 """
@@ -67,11 +66,6 @@ def freqs_to_probs(QABnk):
     # Calculate transition probabilities from state transition counts and state counts.
     for (tag1, tag2) in A.keys():
         A[(tag1, tag2)] = A[(tag1, tag2)] / Q[(tag1, 1)]
-    # q_count = functools.reduce(lambda x,y: x+y, Q.values()) - Q[(TAG_Q0,1)] - Q[(TAG_QF,i)]
-    #     if q_count != 0:
-    #         for (tag,j) in Q:
-    #             if tag != TAG_Q0 and tag != TAG_QF:
-    #                 Q[(tag,j] = Q[tag]/q_count
     Q = [q for (q,i) in Q if i == 1]
     return (Q,A,B,n,k)
 
