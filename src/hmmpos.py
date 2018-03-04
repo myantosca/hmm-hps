@@ -48,8 +48,6 @@ def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
         Q[(tag, isize)] = 1 if (not ((tag, isize) in Q)) else Q[(tag, isize)] + 1
         # Add count to emission probability matrix.
         B[(tag, igram)] = 1 if (not ((tag, igram) in B)) else B[(tag, igram)] + 1
-        #for q in TAGSET:
-        #    B[(q, igram[:isize-1] + ((WORD_UNK, LANG_UNK),))] = 0
     return (Q, A, B, ngram, tag)
 
 """
