@@ -1,7 +1,8 @@
 import argparse
-#import functools
 from itertools import product
 import re
+from math import log,pow,e
+import sys
 
 """
 Command-line arguments
@@ -20,6 +21,7 @@ TAG_Q0 = "Q0"
 TAG_QF = "QF"
 WORD_UNK = "<UNK>"
 LANG_UNK = "eng&spa"
+MIN_PROB = -sys.float_info.max
 
 # From http://universaldependencies.org/u/pos/
 TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
@@ -60,10 +62,10 @@ def freqs_to_probs(QABnk):
     # Calculate emission probabilities from n-gram counts and state counts.
     for (tag, igram) in [(tag, igram) for (tag, igram) in B.keys() if (tag != TAG_Q0 and tag != TAG_QF)]:
         isize = len(igram)
-        B[(tag, igram)] = (B[(tag, igram)] + k) / (Q[(tag, isize)] + k*V)
+        B[(tag, igram)] = log((B[(tag, igram)] + k) / (Q[(tag, isize)] + k*V))
     # Calculate transition probabilities from state transition counts and state counts.
     for (tag1, tag2) in A.keys():
-        A[(tag1, tag2)] = A[(tag1, tag2)] / Q[(tag1, 1)]
+        A[(tag1, tag2)] = log(A[(tag1, tag2)] / Q[(tag1, 1)])
     Q = [q for (q,i) in Q if i == 1]
     return (Q,A,B,n,k)
 
@@ -109,15 +111,15 @@ def freqs_from_file(input_file, n, k):
 
 def observation_fallback(B,s,o,n):
     if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
-        return 0
+        return MIN_PROB
     elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'SYM' and s != 'PUNCT':
-        return 0
+        return MIN_PROB
     elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and (s == 'SYM' or s == 'PUNCT'):
-        return 0
+        return MIN_PROB
     elif re.match('^[^A-ZÁÉÍÓÚÑ]+$', o[n-1][0]) and s == 'PROPN':
-        return 0
+        return MIN_PROB
     elif s in CLOSED_TAGS:
-        return 0
+        return MIN_PROB
     else:
         return B[(s, ((WORD_UNK,LANG_UNK),))]
 
@@ -131,13 +133,13 @@ def observation_composite(B,s,ngram,t):
         if isize <= t:
             if (i < n - 1):
                 weight = weight - weight / 2.0
-            result += weight * B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram, isize)
-    return result
+            result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram, isize))
+    return log(result) if (result > 0) else MIN_PROB
 
 
 def observation_backoff(B,s,ngram):
     if len(ngram) == 0:
-        return 0
+        return MIN_PROB
     elif len(ngram) == 1:
         return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1)
     else:
@@ -157,8 +159,8 @@ def viterbi_decode(QABnk, O, ngram_backoff):
     backptr = {}
     for s in Q:
         b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],1)
-        a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else 0
-        viterbi[(s,1)] = a * b
+        a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else MIN_PROB
+        viterbi[(s,1)] = a + b
         backptr[(s,1)] = TAG_Q0
     t = 2
     ngram = O[0]
@@ -167,26 +169,26 @@ def viterbi_decode(QABnk, O, ngram_backoff):
             ngram = ngram[1:]
         ngram += o
         for s in Q:
-            amax = 0
-            viterbi[(s,t)] = 0
+            amax = MIN_PROB
+            viterbi[(s,t)] = MIN_PROB
             for r in Q:
-                x = A[(r,s)] if (r,s) in A else 0
-                a = viterbi[(r,t-1)] * x
+                x = A[(r,s)] if (r,s) in A else MIN_PROB
+                a = viterbi[(r,t-1)] + x
                 if ngram_backoff:
                     b = observation_backoff(B, s, ngram)
                 else:
                     b = observation_composite(B, s, ngram, t)
-
-                viterbi[(s,t)] = max(viterbi[(s,t)], a * b)
+                #print("{} ({} -> {}, {}): [x = {}, a = {}, b = {}]".format(t,r,s,ngram,x,a,b))
+                viterbi[(s,t)] = max(viterbi[(s,t)], a + b)
                 if (a > amax):
                     backptr[(s,t)] = r
                     amax = a
         t += 1
 
-    viterbi[(TAG_QF, t)] = 0
+    viterbi[(TAG_QF, t)] = MIN_PROB
     for s in Q:
-        a = A[(s,TAG_QF)] if (s, TAG_QF) in A else 0
-        if (a * viterbi[(s, t-1)] > viterbi[(TAG_QF, t)]):
+        a = A[(s,TAG_QF)] if (s, TAG_QF) in A else MIN_PROB
+        if (a + viterbi[(s, t-1)] > viterbi[(TAG_QF, t)]):
             viterbi[(TAG_QF, t)] = a
             backptr[(TAG_QF, t)] = s
 
