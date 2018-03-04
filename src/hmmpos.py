@@ -85,12 +85,6 @@ def freqs_from_file(input_file, n, k):
     A = { qq : k for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies with Laplace smoothing for unknown words.
     B = { (q, ((WORD_UNK, LANG_UNK),)) : 0 for q in TAGSET }
-    # for q in TAGSET:
-    #     for i in [i+1 for i in range(n)]:
-    #         igram = ()
-    #         for j in range(i):
-    #             igram += ((WORD_UNK, LANG_UNK),)
-    #         B[(q,igram)] = 0
     # Initialize ngram cursor to empty tuple.
     ngram = ()
     # Initialize last tag to start state.
