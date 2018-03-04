@@ -80,7 +80,7 @@ Build model of frequencies from annotated file.
 """
 def freqs_from_file(input_file, n, k):
     # Initialize state counts with Laplace smoothing.
-    Q = { (q, i) : k for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
+    Q = { (q, i) : k * len(TAGSET) for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
     # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing).
     A = { qq : k for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies with Laplace smoothing for unknown words.
