@@ -11,6 +11,9 @@ parser.add_argument('--training_file', type=str)
 parser.add_argument('--test_file', type=str)
 parser.add_argument('--n', type=int)
 parser.add_argument('--k', type=float)
+ngram_backoff = parser.add_mutually_exclusive_group()
+ngram_backoff.add_argument('--ngram_backoff', action='store_true')
+ngram_backoff.add_argument('--ngram_weights', action='store_false')
 args = parser.parse_args()
 
 TAG_Q0 = "Q0"
@@ -78,7 +81,7 @@ Build model of frequencies from annotated file.
 def freqs_from_file(input_file, n, k):
     # Initialize state counts with Laplace smoothing.
     Q = { (q, i) : k for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
-    # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing). 
+    # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing).
     A = { qq : k for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies with Laplace smoothing for unknown words.
     B = { (q, ((WORD_UNK, LANG_UNK),)) : 0 for q in TAGSET }
@@ -152,12 +155,12 @@ def observation_backoff(B,s,ngram):
     elif len(ngram) == 1:
         return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1)
     else:
-        return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:]) 
+        return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:])
 
 """
 Perform a Viterbi decoding given an observation sequence and a HMM.
 """
-def viterbi_decode(QABnk, O):
+def viterbi_decode(QABnk, O, ngram_backoff):
     # Return the base case for an empty list of observations.
     if len(O) == 0:
         return [TAG_Q0, TAG_QF]
@@ -169,30 +172,27 @@ def viterbi_decode(QABnk, O):
     for s in Q:
         b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],1)
         a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else 0
-        #print("s = {}, a = {}, b = {}, O[0] = {}".format(s,a,b,O[0]))
         viterbi[(s,1)] = a * b
         backptr[(s,1)] = TAG_Q0
     t = 2
     ngram = O[0]
     for o in O[1:]:
-        #print("o = {}".format(o))
         if (len(ngram) == n):
             ngram = ngram[1:]
         ngram += o
         for s in Q:
             amax = 0
             viterbi[(s,t)] = 0
-            #backptr[(s,t)] = TAG_Q0
             for r in Q:
                 x = A[(r,s)] if (r,s) in A else 0
                 a = viterbi[(r,t-1)] * x
-                #b = B[(s,o)] if (s,o) in B else observation_fallback(B,s,o,n)
-                b = observation_composite(B, s, ngram, t)
-                #b = observation_backoff(B, s, ngram)
-                #print("r = {}, s = {}, x = {}, a = {}, amax = {}, b = {}".format(r,s,x,a,amax,b))
+                if ngram_backoff:
+                    b = observation_backoff(B, s, ngram)
+                else:
+                    b = observation_composite(B, s, ngram, t)
+
                 viterbi[(s,t)] = max(viterbi[(s,t)], a * b)
                 if (a > amax):
-                    #print("amax = {}".format(a))
                     backptr[(s,t)] = r
                     amax = a
         t += 1
@@ -200,7 +200,6 @@ def viterbi_decode(QABnk, O):
     viterbi[(TAG_QF, t)] = 0
     for s in Q:
         a = A[(s,TAG_QF)] if (s, TAG_QF) in A else 0
-        #print("s = {}, a = {}, viterbi[(s,t-1)] = {}".format(s,a, viterbi[(s,t-1)]))
         if (a * viterbi[(s, t-1)] > viterbi[(TAG_QF, t)]):
             viterbi[(TAG_QF, t)] = a
             backptr[(TAG_QF, t)] = s
@@ -215,18 +214,18 @@ def walk_backpointers(backptr, cursor):
         result = walk_backpointers(backptr, (backptr[(tag,t)], t-1))
         result.append(tag)
         return result
-    
 
-def test_model(model, test_file):
+
+def test_model(model, test_file, ngram_backoff):
     with open(test_file) as fp:
         observations = []
         for line in iter(fp.readline, ''):
             line = line.strip()
-            
+
             # End of sentence
             if len(line) == 0:
                 #print(observations)
-                tags = viterbi_decode(model, observations)
+                tags = viterbi_decode(model, observations, ngram_backoff)
                 for result in zip(observations, tags):
                     #print(result)
                     word = result[0][0][0]
@@ -240,7 +239,7 @@ def test_model(model, test_file):
 
 def train_model(training_file, n, k):
     return freqs_to_probs(freqs_from_file(training_file, n, k))
-        
+
 """
 main
 """
@@ -257,5 +256,4 @@ model = train_model(args.training_file, args.n, args.k)
 # for b in B:
 #     print("B[{0}] = {1}".format(b, B[b]))
 
-test_model(model, args.test_file)
-
+test_model(model, args.test_file, args.ngram_backoff)
