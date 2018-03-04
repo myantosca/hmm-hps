@@ -120,6 +120,8 @@ def observation_fallback(B,s,o,n):
         return MIN_PROB
     elif s in CLOSED_TAGS:
         return MIN_PROB
+    elif re.match('^["\'.?,;:!¿¡]+$', o[n-1][0]) and s != 'PUNCT':
+        return MIN_PROB
     else:
         return B[(s, ((WORD_UNK,LANG_UNK),))]
 
