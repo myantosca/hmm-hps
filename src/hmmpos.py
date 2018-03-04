@@ -121,9 +121,9 @@ def freqs_from_file(input_file, n, k):
 def observation_fallback(B,s,o,n):
     if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
         return 0
-    elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'PUNCT':
+    elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'SYM' and s != 'PUNCT':
         return 0
-    elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and s == 'SYM':
+    elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and (s == 'SYM' or s == 'PUNCT'):
         return 0
     elif re.match('^[^A-ZÁÉÍÓÚÑ]+$', o[n-1][0]) and s == 'PROPN':
         return 0
