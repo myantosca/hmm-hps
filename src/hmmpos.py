@@ -123,7 +123,9 @@ def observation_fallback(B,s,o,n):
         return 0
     elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'PUNCT':
         return 0
-    elif re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s == 'SYM':
+    elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and s == 'SYM':
+        return 0
+    elif re.match('^[^A-ZÁÉÍÓÚÑ]+$', o[n-1][0]) and s == 'PROPN':
         return 0
     elif s in CLOSED_TAGS:
         return 0
