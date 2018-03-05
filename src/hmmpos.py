@@ -15,6 +15,9 @@ parser.add_argument('--k', type=float)
 ngram_backoff = parser.add_mutually_exclusive_group()
 ngram_backoff.add_argument('--ngram_backoff', action='store_true')
 ngram_backoff.add_argument('--ngram_weights', action='store_false')
+heuristic_fallback=parser.add_mutually_exclusive_group()
+heuristic_fallback.add_argument('--heuristic_fallback', action='store_true')
+heuristic_fallback.add_argument('--no_heuristic_fallback', action='store_false')
 args = parser.parse_args()
 
 TAG_Q0 = "Q0"
@@ -109,23 +112,23 @@ def freqs_from_file(input_file, n, k):
     # Return a model of counts.
     return (Q,A,B,n,k)
 
-def observation_fallback(B,s,o,n):
-    if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
-        return MIN_PROB
-    elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'SYM' and s != 'PUNCT':
-        return MIN_PROB
-    elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and (s == 'SYM' or s == 'PUNCT'):
-        return MIN_PROB
-    elif re.match('^[^A-ZÁÉÍÓÚÑ]+$', o[n-1][0]) and s == 'PROPN':
-        return MIN_PROB
-    elif s in CLOSED_TAGS:
-        return MIN_PROB
-    elif re.match('^["\'.?,;:!¿¡]+$', o[n-1][0]) and s != 'PUNCT':
-        return MIN_PROB
-    else:
-        return B[(s, ((WORD_UNK,LANG_UNK),))]
+def observation_fallback(B,s,o,n,heuristic_fallback):
+    if heuristic_fallback:
+        if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
+            return MIN_PROB
+        elif re.match('^[^A-zÁÉÍÓÚáéíóúñ0-9]+$', o[n-1][0]) and s != 'SYM' and s != 'PUNCT':
+            return MIN_PROB
+        elif re.match('^[A-ZÁÉÍÓÚÑa-záéíóúñ]+$', o[n-1][0]) and (s == 'SYM' or s == 'PUNCT'):
+            return MIN_PROB
+        elif re.match('^[^A-ZÁÉÍÓÚÑ]+$', o[n-1][0]) and s == 'PROPN':
+            return MIN_PROB
+        elif s in CLOSED_TAGS:
+            return MIN_PROB
+        elif re.match('^["\'.?,;:!¿¡]+$', o[n-1][0]) and s != 'PUNCT':
+            return MIN_PROB
+    return B[(s, ((WORD_UNK,LANG_UNK),))]
 
-def observation_composite(B,s,ngram,t):
+def observation_composite(B,s,ngram,t,heuristic_fallback):
     weight = 1.0
     result = 0.0
     n = len(ngram)
@@ -135,22 +138,22 @@ def observation_composite(B,s,ngram,t):
         if isize <= t:
             if (i < n - 1):
                 weight = weight - weight / 2.0
-            result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram, isize))
+            result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram,isize,heuristic_fallback))
     return log(result) if (result > 0) else MIN_PROB
 
 
-def observation_backoff(B,s,ngram):
+def observation_backoff(B,s,ngram,heuristic_fallback):
     if len(ngram) == 0:
         return MIN_PROB
     elif len(ngram) == 1:
-        return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1)
+        return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1,heuristic_fallback)
     else:
         return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:])
 
 """
 Perform a Viterbi decoding given an observation sequence and a HMM.
 """
-def viterbi_decode(QABnk, O, ngram_backoff):
+def viterbi_decode(QABnk, O, ngram_backoff, heuristic_fallback):
     # Return the base case for an empty list of observations.
     if len(O) == 0:
         return [TAG_Q0, TAG_QF]
@@ -160,7 +163,7 @@ def viterbi_decode(QABnk, O, ngram_backoff):
     viterbi = {}
     backptr = {}
     for s in Q:
-        b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],1)
+        b = B[(s,O[0])] if (s,O[0]) in B else observation_fallback(B,s,O[0],1,heuristic_fallback)
         a = A[(TAG_Q0,s)] if (TAG_Q0,s) in A else MIN_PROB
         viterbi[(s,1)] = a + b
         backptr[(s,1)] = TAG_Q0
@@ -177,10 +180,9 @@ def viterbi_decode(QABnk, O, ngram_backoff):
                 x = A[(r,s)] if (r,s) in A else MIN_PROB
                 a = viterbi[(r,t-1)] + x
                 if ngram_backoff:
-                    b = observation_backoff(B, s, ngram)
+                    b = observation_backoff(B, s, ngram, heuristic_fallback)
                 else:
-                    b = observation_composite(B, s, ngram, t)
-                #print("{} ({} -> {}, {}): [x = {}, a = {}, b = {}]".format(t,r,s,ngram,x,a,b))
+                    b = observation_composite(B, s, ngram, t, heuristic_fallback)
                 viterbi[(s,t)] = max(viterbi[(s,t)], a + b)
                 if (a > amax):
                     backptr[(s,t)] = r
@@ -206,7 +208,7 @@ def walk_backpointers(backptr, cursor):
         return result
 
 
-def test_model(model, test_file, ngram_backoff):
+def test_model(model, test_file, ngram_backoff, heuristic_fallback):
     with open(test_file) as fp:
         observations = []
         for line in iter(fp.readline, ''):
@@ -215,7 +217,7 @@ def test_model(model, test_file, ngram_backoff):
             # End of sentence
             if len(line) == 0:
                 #print(observations)
-                tags = viterbi_decode(model, observations, ngram_backoff)
+                tags = viterbi_decode(model, observations, ngram_backoff, heuristic_fallback)
                 for result in zip(observations, tags):
                     #print(result)
                     word = result[0][0][0]
@@ -246,4 +248,4 @@ model = train_model(args.training_file, args.n, args.k)
 # for b in B:
 #     print("B[{0}] = {1}".format(b, B[b]))
 
-test_model(model, args.test_file, args.ngram_backoff)
+test_model(model, args.test_file, args.ngram_backoff, args.heuristic_fallback)
