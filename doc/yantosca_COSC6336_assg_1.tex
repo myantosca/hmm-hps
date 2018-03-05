@@ -1,0 +1,103 @@
+%
+% File naaclhlt2018.tex
+%
+%% Based on the style files for NAACL-HLT 2018, which were
+%% Based on the style files for ACL-2015, with some improvements
+%%  taken from the NAACL-2016 style
+%% Based on the style files for ACL-2014, which were, in turn,
+%% based on ACL-2013, ACL-2012, ACL-2011, ACL-2010, ACL-IJCNLP-2009,
+%% EACL-2009, IJCNLP-2008...
+%% Based on the style files for EACL 2006 by 
+%%e.agirre@ehu.es or Sergi.Balari@uab.es
+%% and that of ACL 08 by Joakim Nivre and Noah Smith
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[hyperref]{naaclhlt2018}
+\usepackage{times}
+\usepackage{latexsym}
+
+\usepackage{url}
+
+\aclfinalcopy % Uncomment this line for the final submission
+%\def\aclpaperid{***} %  Enter the acl Paper ID here
+
+%\setlength\titlebox{5cm}
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+\newcommand\BibTeX{B{\sc ib}\TeX}
+
+\title{HMM+: A Fallback-Heuristic Approach to Part-of-Speech Tagging with Hidden Markov Models}
+
+\author{Michael Yantosca \\
+  University of Houston Department of Computer Science / 3551 Cullen Blvd., Houston, TX 77204 \\
+  {\tt mike@archivarius.net} \\}
+
+\date{2018-03-04}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+\end{abstract}
+
+\section{Introduction}
+
+\section{Methodology}
+
+Frequency counter for arbitrary order n-gram
+Frequency to probability transform
+Viterbi decoding
+Laplace smoothing -> add-k smoothing on transition and emission probabilities
+Heuristic fallback
+Rudimentary interpolation, n-gram backoff
+Iterative refinement initially testing dev -> dev, then train -> dev
+moved to log probabilities
+Two submissions to the competition
+
+rapid development prototyping - back of the envelope accuracy measure with diff <1> <2> | egrep '<' | wc -l
+
+\section{Experimental Results}
+
+problems encountered:
+- bugs
+- failure to reproduce results with the same exec params
+-- first of equiprobable come, first serve
+- numerical underflow
+- float\_info.min vs. -float\_info.max (relevant when swapping to log prob)
+
+with heuristic fallback vs. without
+
+add-k smoothing (varying k)
+
+backoff vs. rudimentary interpolation
+
+varying n-gram order
+
+\section{Conclusions}
+
+training set too sparse in higher-order n-grams to be of much use
+most accurate in 1-grams controlling for other variables
+decreasing k increased accuracy for dev and test sets, but may not apply in cases with many new unknown vocab
+better interpolation, proper selection of lambda factors
+better smoothing (i.e., more intelligent distribution of prob mass over unknowns)
+integration of heuristic intuitions earlier in pipeline may afford performance boost in decoding if not having to do heuristic checks all the time (wider feature set)
+lookahead: function of multi-class words often dependent on following context, not only preceding
+future work: transfer of language ID to state instead of feature
+
+\section*{Acknowledgments}
+
+Dr. Solorio for heuristic suggestions in lecture (2/28/2018)
+NAACL template authors
+Jurafsky and Martin for succinctly laying out HMMs in 3rd draft of text
+
+\bibliography{yantosca_COSC6336_assg_1}
+\bibliographystyle{acl_natbib}
+
+\appendix
+
+\section{Supplemental Material}
+\label{sec:supplemental}
+
+\end{document}
