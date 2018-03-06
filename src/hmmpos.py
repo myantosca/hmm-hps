@@ -18,6 +18,9 @@ ngram_backoff.add_argument('--ngram_weights', action='store_false')
 heuristic_fallback=parser.add_mutually_exclusive_group()
 heuristic_fallback.add_argument('--heuristic_fallback', action='store_true')
 heuristic_fallback.add_argument('--no_heuristic_fallback', action='store_false')
+heuristic_preseed=parser.add_mutually_exclusive_group()
+heuristic_preseed.add_argument('--heuristic_preseed', action='store_true')
+heuristic_preseed.add_argument('--no_heuristic_preseed', action='store_false')
 args = parser.parse_args()
 
 TAG_Q0 = "Q0"
@@ -25,6 +28,11 @@ TAG_QF = "QF"
 WORD_UNK = "<UNK>"
 LANG_UNK = "eng&spa"
 MIN_PROB = -sys.float_info.max
+MAX_PROB = log(1.0)
+
+RE_SOME_WORD = re.compile('^[A-ZÁÉÍÓÚÑa-záéíóúñ0-9]+$')
+RE_CAP       = re.compile('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$')
+RE_ALL_PUNCT = re.compile('^["\'.?,;:!¿¡]+$')
 
 # From http://universaldependencies.org/u/pos/
 TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
@@ -37,12 +45,17 @@ CLOSED_TAGS = ['ADP', 'AUX', 'CCONJ', 'DET', 'NUM', 'PART', 'PRON', 'SCONJ']
 """
 Update frequency model with observation and concomitant state annotation.
 """
-def add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag):
+def add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, word, lang, tag):
     # Chop off oldest contributor to n-gram cursor if necessary.
     if len(ngram) == n:
         ngram = ngram[1:]
+    # Calculate dependent features.
+    if not word is None:
+        some_word = (not RE_SOME_WORD.match(word) is None) if preseed else None
+        cap = (not RE_CAP.match(word) is None) if preseed else None
+        all_punct = (not RE_ALL_PUNCT.match(word) is None) if preseed else None
     # No emissions if tag is initial or final state.
-    ngram = ngram + ((word, lang),) if (tag != TAG_Q0 and tag != TAG_QF) else ()
+    ngram = ngram + ((word, lang, some_word, cap, all_punct),) if (tag != TAG_Q0 and tag != TAG_QF) else ()
     # Increment count of last_tag -> tag in transition probability matrix.
     A[(last_tag, tag)] = 1 if not ((last_tag, tag) in A) else A[(last_tag, tag)] + 1
     # update n-gram counts for all orders of n-gram
@@ -70,18 +83,41 @@ def freqs_to_probs(QABnk):
     for (tag1, tag2) in A.keys():
         A[(tag1, tag2)] = log(A[(tag1, tag2)] / Q[(tag1, 1)])
     Q = [q for (q,i) in Q if i == 1]
+    # TODO: Adjust probabilities for unknown words if preseed is in effect.
+    for (tag, igram) in [(tag, igram) for (tag, igram) in B.keys() if igram[len(igram)-1][0] == WORD_UNK and not igram[len(igram)-1][2] is None]:
+        index = len(igram)-1
+        if tag == TAG_Q0 or tag == TAG_QF:
+            B[(tag,igram)] = MIN_PROB
+        elif tag in CLOSED_TAGS:
+            B[(tag,igram)] = MIN_PROB
+        elif igram[index][3]:
+            B[(tag,igram)] = MIN_PROB if tag != 'PROPN' or igram[index][4] else MAX_PROB
+        elif tag == 'PROPN':
+            B[(tag,igram)] = MIN_PROB
+        elif igram[index][2]:
+            B[(tag,igram)] = MIN_PROB if tag == 'PUNCT' or tag == 'SYM' or igram[index][4] else log(pow(e, B[(tag,igram)]) * 1.125)
+        elif igram[index][4]:
+            B[(tag,igram)] = MIN_PROB if tag != 'PUNCT' else MAX_PROB
     return (Q,A,B,n,k)
+
+
+def generate_emission_matrix(preseed):
+    if (not preseed):
+        return { (q, ((WORD_UNK, LANG_UNK, None, None, None),)) : 0 for q in TAGSET }
+    else:
+        # key = (word, lang, word =~ /\w+/, word =~ /^[A-ZA-ZÁÉÍÓÚÑ]/, word =~ /^["\'.?,;:!¿¡]+$/)
+        return { (q, ((WORD_UNK, LANG_UNK, SOME_WORD, CAP, ALL_PUNCT),)) : 0 for (q, SOME_WORD, CAP, ALL_PUNCT) in product(TAGSET, [True, False], [True, False], [True, False]) }
 
 """
 Build model of frequencies from annotated file.
 """
-def freqs_from_file(input_file, n, k):
+def freqs_from_file(input_file, n, k, preseed):
     # Initialize state counts with Laplace smoothing.
     Q = { (q, i) : k * len(TAGSET) for (q,i) in product(TAGSET, [i+1 for i in range(n)]) }
     # Initialize transition frequencies to dictionary populated with all permutations of tag transitions set to 1 (Laplace smoothing).
     A = { qq : k for qq in product(TAGSET, TAGSET) }
     # Initialize emission frequencies with Laplace smoothing for unknown words.
-    B = { (q, ((WORD_UNK, LANG_UNK),)) : 0 for q in TAGSET }
+    B = generate_emission_matrix(preseed)
     # Initialize ngram cursor to empty tuple.
     ngram = ()
     # Initialize last tag to start state.
@@ -95,7 +131,7 @@ def freqs_from_file(input_file, n, k):
                 # Count matching start state
                 Q[(TAG_Q0, 1)] += 1
                 # Update model for end of sentence
-                (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, None, None, TAG_QF)
+                (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, None, None, TAG_QF)
                 # Reset ngram cursor
                 ngram = ()
                 # Reset previous tag to start state.
@@ -105,10 +141,10 @@ def freqs_from_file(input_file, n, k):
                 # Break word annotation by tabs. Grab the first three tokens.
                 (word, lang, tag) = tuple(line.split('\t')[0:3])
                 # Update model for current annotation.
-                (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, word, lang, tag)
+                (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, word, lang, tag)
         # Check for implicit end of sentence by EOF (in case annotator forgot final blank line).
         if last_tag != TAG_Q0:
-            (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, ngram, last_tag, None, None, TAG_QF)
+            (Q, A, B, ngram, last_tag) = add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, None, None, TAG_QF)
     # Return a model of counts.
     return (Q,A,B,n,k)
 
@@ -126,7 +162,8 @@ def observation_fallback(B,s,o,n,heuristic_fallback):
             return MIN_PROB
         elif re.match('^["\'.?,;:!¿¡]+$', o[n-1][0]) and s != 'PUNCT':
             return MIN_PROB
-    return B[(s, ((WORD_UNK,LANG_UNK),))]
+    return B[(s, ((WORD_UNK,LANG_UNK) + o[n-1][2:],))]
+
 
 def observation_composite(B,s,ngram,t,heuristic_fallback):
     weight = 1.0
@@ -208,7 +245,7 @@ def walk_backpointers(backptr, cursor):
         return result
 
 
-def test_model(model, test_file, ngram_backoff, heuristic_fallback):
+def test_model(model, test_file, ngram_backoff, heuristic_fallback, preseed):
     with open(test_file) as fp:
         observations = []
         for line in iter(fp.readline, ''):
@@ -227,16 +264,20 @@ def test_model(model, test_file, ngram_backoff, heuristic_fallback):
                 print("")
                 observations = []
             else:
-                observations.append((tuple(line.split('\t')[0:2]),))
+                ngram = (tuple(line.split('\t')[0:2]))
+                ngram += ((not RE_SOME_WORD.match(ngram[0]) is None) if preseed else None,)
+                ngram += ((not RE_CAP.match(ngram[0]) is None) if preseed else None,)
+                ngram += ((not RE_ALL_PUNCT.match(ngram[0]) is None) if preseed else None,)
+                observations.append((ngram,))
 
-def train_model(training_file, n, k):
-    return freqs_to_probs(freqs_from_file(training_file, n, k))
+def train_model(training_file, n, k, preseed):
+    return freqs_to_probs(freqs_from_file(training_file, n, k, preseed))
 
 """
 main
 """
 
-model = train_model(args.training_file, args.n, args.k)
+model = train_model(args.training_file, args.n, args.k, args.heuristic_preseed)
 
 # (Q,A,B,n,k) = model
 # print("***** Q *****")
@@ -248,4 +289,4 @@ model = train_model(args.training_file, args.n, args.k)
 # for b in B:
 #     print("B[{0}] = {1}".format(b, B[b]))
 
-test_model(model, args.test_file, args.ngram_backoff, args.heuristic_fallback)
+test_model(model, args.test_file, args.ngram_backoff, args.heuristic_fallback, args.heuristic_preseed)
