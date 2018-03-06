@@ -177,7 +177,7 @@ def observation_composite(B,s,ngram,t,heuristic_fallback):
         isize = len(igram)
         if isize <= t:
             if (i < n - 1):
-                weight = weight - weight / 2.0
+                weight = weight - weight * 0.25
             result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram,isize,heuristic_fallback))
     return log(result) if (result > 0) else MIN_PROB
 
