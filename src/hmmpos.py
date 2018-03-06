@@ -185,7 +185,7 @@ def observation_backoff(B,s,ngram,heuristic_fallback):
     elif len(ngram) == 1:
         return B[(s,ngram)] if (s,ngram) in B else observation_fallback(B,s,ngram,1,heuristic_fallback)
     else:
-        return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:])
+        return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:],heuristic_fallback)
 
 """
 Perform a Viterbi decoding given an observation sequence and a HMM.
