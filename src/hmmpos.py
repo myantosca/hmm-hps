@@ -84,7 +84,7 @@ def freqs_to_probs(QABnk):
         A[(tag1, tag2)] = log(A[(tag1, tag2)] / Q[(tag1, 1)])
     for (tag1, tag2) in A.keys():
         if tag1 == TAG_QF or tag2 == TAG_Q0:
-            A[(tag1, tag2)] = 0
+            A[(tag1, tag2)] = MIN_PROB
     Q = [q for (q,i) in Q if i == 1]
     # TODO: Adjust probabilities for unknown words if preseed is in effect.
     for (tag, igram) in [(tag, igram) for (tag, igram) in B.keys() if igram[len(igram)-1][0] == WORD_UNK and not igram[len(igram)-1][2] is None]:
