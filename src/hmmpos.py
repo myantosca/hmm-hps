@@ -30,8 +30,8 @@ LANG_UNK = "eng&spa"
 MIN_PROB = -sys.float_info.max
 MAX_PROB = log(1.0)
 
-RE_SOME_WORD = re.compile('^[A-ZÁÉÍÓÚÑa-záéíóúñ0-9]+$')
-RE_CAP       = re.compile('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$')
+RE_SOME_WORD = re.compile('[A-ZÁÉÍÓÚÑa-záéíóúñ0-9]')
+RE_CAP       = re.compile('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+$')
 RE_ALL_PUNCT = re.compile('^["\'.?,;:!¿¡]+$')
 
 # From http://universaldependencies.org/u/pos/
