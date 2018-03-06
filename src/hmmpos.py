@@ -98,7 +98,7 @@ def freqs_to_probs(QABnk):
         elif tag == 'PROPN':
             B[(tag,igram)] = MIN_PROB
         elif igram[index][2]:
-            B[(tag,igram)] = MIN_PROB if tag == 'PUNCT' or tag == 'SYM' or igram[index][4] else log(pow(e, B[(tag,igram)]) * 1.125)
+            B[(tag,igram)] = MIN_PROB if tag == 'PUNCT' or tag == 'SYM' or tag == 'INTJ' or tag == 'UNK' or tag == 'X' or igram[index][4] else log(pow(e, B[(tag,igram)]) * 1.125)
         elif igram[index][4]:
             B[(tag,igram)] = MIN_PROB if tag != 'PUNCT' else MAX_PROB
     return (Q,A,B,n,k)
