@@ -29,7 +29,7 @@
 
 \newcommand\BibTeX{B{\sc ib}\TeX}
 
-\title{HMM+: A Fallback-Heuristic Approach to Part-of-Speech Tagging with Hidden Markov Models}
+\title{HMM-HPS: A Heuristic Preseed Approach to Part-of-Speech Tagging with Hidden Markov Models}
 
 \author{Michael Yantosca \\
   University of Houston Department of Computer Science / 3551 Cullen Blvd., Houston, TX 77204 \\
@@ -54,7 +54,10 @@ Heuristic fallback
 Rudimentary interpolation, n-gram backoff
 Iterative refinement initially testing dev -> dev, then train -> dev
 moved to log probabilities
-Two submissions to the competition
+Heuristic preseed
+integration of heuristic intuitions earlier in pipeline afforded performance boost in decoding by not having to do heuristic checks all the time (wider feature set)/caveat: probability mass not redistributed in all cases
+N-gram weight adjustment
+Five submissions to the competition
 
 rapid development prototyping - back of the envelope accuracy measure with diff <1> <2> | egrep '<' | wc -l
 
@@ -78,11 +81,10 @@ varying n-gram order
 \section{Conclusions}
 
 training set too sparse in higher-order n-grams to be of much use
-most accurate in 1-grams controlling for other variables
+most accurate in 1-grams controlling for other variables until adjusted n-gram weights, at which point higher-order n-grams provided better accuracy (up to 4, then decay?)
 decreasing k increased accuracy for dev and test sets, but may not apply in cases with many new unknown vocab
 better interpolation, proper selection of lambda factors
 better smoothing (i.e., more intelligent distribution of prob mass over unknowns)
-integration of heuristic intuitions earlier in pipeline may afford performance boost in decoding if not having to do heuristic checks all the time (wider feature set)
 lookahead: function of multi-class words often dependent on following context, not only preceding
 future work: transfer of language ID to state instead of feature
 
