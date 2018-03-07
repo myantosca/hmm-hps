@@ -1,6 +1,13 @@
 FNAME_BASE=yantosca_COSC6336_assg_1
 
-all: doc
+all: doc srcdist
+
+srcdist:
+	@mkdir -p ghostant
+	@cp src/hmmpos.py ghostant
+	@cp src/README.txt ghostant
+	@cp -r dataset ghostant
+	@tar cvzf yantosca_COSC6336_assg_1.tar.gz ghostant
 
 doc: doc/$(FNAME_BASE).pdf
 
@@ -15,6 +22,7 @@ superclean-doc-%:
 clean: clean-doc-$(FNAME_BASE)
 	@rm -f *~
 	@rm -f src/*~
+	@rm -rf ghostant
 
 clean-doc-%: 
 	@rm -f doc/$*.aux
