@@ -21,6 +21,10 @@ optional arguments:
   --heuristic_preseed   heuristic preseed of emission probs for unknown tokens
   --no_heuristic_preseed
 
+Competitions
+============
+Submitted under the handle 'ghostant' to COSC 6336 - Part-of-Speech Tagging with HMM CodaLab Competition.
+
 Examples
 ========
 Defaults
