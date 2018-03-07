@@ -1,3 +1,21 @@
+# Copyright 2018 Michael Yantosca
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software
+# and associated documentation files (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+# LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+# Submitted under the handle 'ghostant' to COSC 6336 - Part-of-Speech Tagging with HMM CodaLab Competition
+
 import argparse
 from itertools import product
 import re
@@ -7,21 +25,25 @@ import sys
 """
 Command-line arguments
 """
-parser = argparse.ArgumentParser(description='Annotate a sentence with part-of-speech tags.')
-parser.add_argument('--training_file', type=str)
-parser.add_argument('--test_file', type=str)
-parser.add_argument('--n', type=int)
-parser.add_argument('--k', type=float)
+parser = argparse.ArgumentParser(description='Annotates a series of sentences with part-of-speech tags.')
+parser.add_argument('--training_file', metavar='TRN', type=str, help='3-column .conll training corpus', required=True)
+parser.add_argument('--test_file', metavar='TST', type=str, help='2-column .conll file (w/o POS tags) test corpus', required=True)
+parser.add_argument('--n', type=int, help='highest order of n-gram to include in features', default=1)
+parser.add_argument('--k', type=float, help='add-k smoothing constant', default=0.01)
 ngram_backoff = parser.add_mutually_exclusive_group()
-ngram_backoff.add_argument('--ngram_backoff', action='store_true')
-ngram_backoff.add_argument('--ngram_weights', action='store_false')
+ngram_backoff.add_argument('--ngram_backoff', action='store_true', help='backs off emission probs on n-grams until 1-gram')
+ngram_backoff.add_argument('--ngram_weights', action='store_false', help='composites emission probs on n-grams with weights [iteratively 0.75 of remainder until 1-gram]')
 heuristic_fallback=parser.add_mutually_exclusive_group()
-heuristic_fallback.add_argument('--heuristic_fallback', action='store_true')
+heuristic_fallback.add_argument('--heuristic_fallback', action='store_true', help='heuristic check during decoding for unknown tokens')
 heuristic_fallback.add_argument('--no_heuristic_fallback', action='store_false')
 heuristic_preseed=parser.add_mutually_exclusive_group()
-heuristic_preseed.add_argument('--heuristic_preseed', action='store_true')
+heuristic_preseed.add_argument('--heuristic_preseed', action='store_true', help='heuristic preseed of emission probs for unknown tokens')
 heuristic_preseed.add_argument('--no_heuristic_preseed', action='store_false')
+
 args = parser.parse_args()
+
+if args.heuristic_preseed and args.heuristic_fallback:
+    args.error('--heuristic_preseed and --heuristic_fallback are mutually exclusive. Please choose one or the other.')
 
 TAG_Q0 = "Q0"
 TAG_QF = "QF"
