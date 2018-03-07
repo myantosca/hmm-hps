@@ -29,19 +29,19 @@ Examples
 ========
 Defaults
 
-./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll [--n 1] [--k 0.01] [--ngram_weights] [--no_heuristic_fallback] [--no_heuristic_preseed]
+python3 ./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll [--n 1] [--k 0.01] [--ngram_weights] [--no_heuristic_fallback] [--no_heuristic_preseed]
 
 Most accurate so far tested
 
-./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 4 --k 0.01 --ngram_weights --heuristic_preseed
+python3 ./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 4 --k 0.01 --ngram_weights --heuristic_preseed
 
 Nearly as accurate but much faster
 
-./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 2 --k 0.01 --ngram_weights --heuristic_preseed
+python3 ./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 2 --k 0.01 --ngram_weights --heuristic_preseed
 
 Saving Annotated Output
 
-./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 4 --k 0.01 --ngram_weights --heuristic_preseed > submission.txt
+python3 ./hmmpos.py --training_file dataset/train.conll --test_file dataset/dev.conll --n 4 --k 0.01 --ngram_weights --heuristic_preseed > submission.txt
 
 Best Practices
 ==============
@@ -87,8 +87,8 @@ Output Format
 =============
 The output of the program is the same as the training file format.
 
-Known Bugs
-==========
+Known Bugs/Issues
+=================
 While some effort has been made to preserve probability mass in the employment
 of heuristic pre-seeding, time constraints have prevented a thorough audit
 heretofore. Some work needs to be done in this area.
@@ -103,6 +103,9 @@ etc., not encountered in training. A better solution is in order.
 This tagger has only been tested on code-switched English/Spanish data.
 There is no guarantee as to fitness for any other languages, particularly
 languages with non-Latin orthography.
+
+This program does NOT work with python2. Make sure python3 is the default
+version or explicitly call the program as outlined in the examples.
 
 Contact
 =======
