@@ -203,7 +203,6 @@ def observation_composite(B,s,ngram,t,heuristic_fallback):
             result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram,isize,heuristic_fallback))
     return log(result) if (result > 0) else MIN_PROB
 
-
 def observation_backoff(B,s,ngram,heuristic_fallback):
     if len(ngram) == 0:
         return MIN_PROB
@@ -278,10 +277,8 @@ def test_model(model, test_file, ngram_backoff, heuristic_fallback, preseed):
 
             # End of sentence
             if len(line) == 0:
-                #print(observations)
                 tags = viterbi_decode(model, observations, ngram_backoff, heuristic_fallback)
                 for result in zip(observations, tags):
-                    #print(result)
                     word = result[0][0][0]
                     lang = result[0][0][1]
                     tag  = result[1]
