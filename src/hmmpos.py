@@ -65,7 +65,18 @@ TAGSET = [TAG_Q0, 'ADJ', 'ADP', 'ADV', 'AUX',
 CLOSED_TAGS = ['ADP', 'AUX', 'CCONJ', 'DET', 'NUM', 'PART', 'PRON', 'SCONJ']
 
 """
-Update frequency model with observation and concomitant state annotation.
+Updates frequency model with observation and concomitant state annotation.
+
+Q = state counts
+A = transition counts
+B = observation counts
+n = highest order of n-gram observation history
+preseed = flag whether to heuristically pre-seed emission probabilities for unknown tokens
+ngram = cursor keeping observation history up to nth order
+last_tag = last POS tag seen
+word = current word to add to the observation
+lang = language ID for current word
+tag = current POS tag
 """
 def add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, word, lang, tag):
     # Chop off oldest contributor to n-gram cursor if necessary.
@@ -91,7 +102,21 @@ def add_word_lang_tag(Q, A, B, n, preseed, ngram, last_tag, word, lang, tag):
     return (Q, A, B, ngram, tag)
 
 """
-Convert model of frequencies to probabilities.
+Converts a model of frequencies to one of probabilities.
+
+NB: Some of the heuristic shortcuts that are taken make it so
+that the model cannot be considered to be a true probability
+distribution. The reader is referred to the work by
+Brants, et al. (2007) on stupid backoff. Some attempts
+are made to preserve the probability mass, but a more
+thorough refactoring is needed.
+
+QABnk = model of frequencies
+Q = state counts
+A = transition counts
+B = observation counts
+n = highest order n-gram
+k = add-k smoothing constant
 """
 def freqs_to_probs(QABnk):
     (Q,A,B,n,k) = QABnk
@@ -125,7 +150,11 @@ def freqs_to_probs(QABnk):
             B[(tag,igram)] = MIN_PROB if tag != 'PUNCT' else MAX_PROB
     return (Q,A,B,n,k)
 
+"""
+Generates the initial emission probability matrix with entries for unknown 1-grams.
 
+preseed = flag whether to heuristically pre-seed emission probabilities for unknown tokens
+"""
 def generate_emission_matrix(preseed):
     if (not preseed):
         return { (q, ((WORD_UNK, LANG_UNK, None, None, None),)) : 0 for q in TAGSET }
@@ -134,7 +163,12 @@ def generate_emission_matrix(preseed):
         return { (q, ((WORD_UNK, LANG_UNK, SOME_WORD, CAP, ALL_PUNCT),)) : 0 for (q, SOME_WORD, CAP, ALL_PUNCT) in product(TAGSET, [True, False], [True, False], [True, False]) }
 
 """
-Build model of frequencies from annotated file.
+Builds a model of frequencies from an annotated training file.
+
+input_file = path to the 3-column .conll file to act as the training corpus
+n = highest n-gram order to use in features
+k = add-k smoothing constant
+preseed = flag whether to heuristically pre-seed emission probabilities for unknown tokens
 """
 def freqs_from_file(input_file, n, k, preseed):
     # Initialize state counts with Laplace smoothing.
@@ -173,6 +207,24 @@ def freqs_from_file(input_file, n, k, preseed):
     # Return a model of counts.
     return (Q,A,B,n,k)
 
+
+"""
+Performs a final fallback to emission probabilities for unknown tokens during Viterbi decoding.
+If the heuristic_fallback flag is set, this involves expensive regex matching.
+For best results, it is recommended to set the --heuristic_preseed flag at the command line,
+which roughly translates the regex matches done here into pre-seeded emission probabilities
+so that the feature derivation is implicitly encoded into the emission probability matrix.
+
+The heuristic checks primarily cover handling of proper nouns, punctuation, and unknown closed tags.
+NB: the return of MIN_PROB does not redistribute the probability mass, and so it cannot
+be considered a true probability distribution, similar to stupid backoff by Brants, et al. (2007).
+
+B = emission probability matrix
+s = POS tag
+o = observation/feature vector
+n = order of feature vector
+heuristic_fallback = flag whether to do heuristic checks on final fallback
+"""
 def observation_fallback(B,s,o,n,heuristic_fallback):
     if heuristic_fallback:
         if re.match('^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]*$', o[n-1][0]) and s != 'PROPN':
@@ -190,6 +242,22 @@ def observation_fallback(B,s,o,n,heuristic_fallback):
     return B[(s, ((WORD_UNK,LANG_UNK) + o[n-1][2:],))]
 
 
+"""
+Retrieves emission probabilities for a feature vector according to a composition model.
+The backoff starts with the highest order ngram and checks for existence in the
+emission probability matrix. If the n-gram is a valid key, it uses the found
+probability. If not, it does a fallback to the corresponding unknown 1-gram.
+The resultant value is multiplied by a weight of 0.75 and then added to
+successive weighted probabilities for each order of n-gram until the 1-gram.
+Each successive n-gram takes 0.75 of the remaining weight until the 1-gram
+takes the final remaining 0.25.
+
+B = emission probability matrix
+s = POS tag
+ngram = feature vector
+t = deprecated parameter indicating the observation index in the overall sequence that really ought to be removed
+heuristic_fallback = flag whether to do heuristic checks on final fallback
+"""
 def observation_composite(B,s,ngram,t,heuristic_fallback):
     weight = 1.0
     result = 0.0
@@ -203,6 +271,17 @@ def observation_composite(B,s,ngram,t,heuristic_fallback):
             result += weight * pow(e, B[(s,igram)] if (s,igram) in B else observation_fallback(B,s,igram,isize,heuristic_fallback))
     return log(result) if (result > 0) else MIN_PROB
 
+"""
+Retrieves emission probabilities for a feature vector according to a backoff model.
+The backoff starts with the highest order ngram and checks for existence in the
+emission probability matrix until finally arriving at the 1-gram.
+If the 1-gram is an invalid key, it falls back to an unknown token.
+
+B = emission probability matrix
+s = POS tag
+ngram = feature vector
+heuristic_fallback = flag whether to do heuristic checks on final fallback
+"""
 def observation_backoff(B,s,ngram,heuristic_fallback):
     if len(ngram) == 0:
         return MIN_PROB
@@ -212,7 +291,15 @@ def observation_backoff(B,s,ngram,heuristic_fallback):
         return B[(s,ngram)] if (s,ngram) in B else observation_backoff(B,s,ngram[1:],heuristic_fallback)
 
 """
-Perform a Viterbi decoding given an observation sequence and a HMM.
+Performs a Viterbi decoding given an observation sequence and a HMM.
+The algorithm is an implementation of the pseudocode given in
+Fig 9.11 in Chapter 9 of Speech and Language Processing 3rd ed.
+by Jurasky and Martin.
+
+QABnk = HMM to use in decoding
+O = observed sentence (with language ID)
+ngram_backoff = flag whether to do backoff or weighted composition of emission probabilities
+heuristic_fallback = flag whether to do heuristic checks during decoding
 """
 def viterbi_decode(QABnk, O, ngram_backoff, heuristic_fallback):
     # Return the base case for an empty list of observations.
@@ -259,6 +346,13 @@ def viterbi_decode(QABnk, O, ngram_backoff, heuristic_fallback):
 
     return walk_backpointers(backptr, (TAG_QF, t))
 
+"""
+Walks the back-pointers given by a Viterbi decoding to find
+the most probable sequence of hidden states.
+
+backptr = the dictionary of back-pointers
+cursor = the key from which to start the traversal
+"""
 def walk_backpointers(backptr, cursor):
     (tag,t) = cursor
     if (t <= 0):
@@ -268,30 +362,49 @@ def walk_backpointers(backptr, cursor):
         result.append(tag)
         return result
 
+"""
+Tests a HMM generated by train_model against a given test file.
 
+model = the generated model
+test_file = path to the 2-column .conll file to be tested and annotated
+ngram_backoff = flag whether to do backoff or weighted composition of emission probabilities
+heuristic_fallback = flag whether to do heuristic checks during decoding
+preseed = flag whether to presume heuristic pre-seeding of emission probabilities for unknown tokens
+"""
 def test_model(model, test_file, ngram_backoff, heuristic_fallback, preseed):
     with open(test_file) as fp:
         observations = []
         for line in iter(fp.readline, ''):
             line = line.strip()
-
-            # End of sentence
             if len(line) == 0:
+                # End of sentence
                 tags = viterbi_decode(model, observations, ngram_backoff, heuristic_fallback)
+                # Combine given observations and resultant tags and output annotated sentence to stdout.
                 for result in zip(observations, tags):
                     word = result[0][0][0]
                     lang = result[0][0][1]
                     tag  = result[1]
                     print("{0}\t{1}\t{2}".format(word, lang, tag))
+                # Add end of sentence marker.
                 print("")
                 observations = []
             else:
+                # Build feature vector for a word and language id.
                 ngram = (tuple(line.split('\t')[0:2]))
                 ngram += ((not RE_SOME_WORD.match(ngram[0]) is None) if preseed else None,)
                 ngram += ((not RE_CAP.match(ngram[0]) is None) if preseed else None,)
                 ngram += ((not RE_ALL_PUNCT.match(ngram[0]) is None) if preseed else None,)
+                # Add feature vector to current sentence.
                 observations.append((ngram,))
 
+"""
+Trains a HMM given a 3-column .conll training corpus.
+
+training_file = path to the 3-column .conll file to act as the training corpus
+n = highest n-gram order to use in features
+k = add-k smoothing constant
+preseed = flag whether to heuristically pre-seed emission probabilities for unknown tokens
+"""
 def train_model(training_file, n, k, preseed):
     return freqs_to_probs(freqs_from_file(training_file, n, k, preseed))
 
