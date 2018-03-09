@@ -24,13 +24,15 @@ from subprocess import check_output
 Command-line arguments
 """
 parser = argparse.ArgumentParser(description='Runs the hmmpos.py part-of-speech tagger and collects stats over the various runs.')
-parser.add_argument('--training_file', metavar='TRN', type=str, help='3-column .conll training corpus', required=True)
+parser.add_argument('--training_file', metavar='TRN', type=str, help='3-column .conll training corpus')
 parser.add_argument('--test_file', metavar='TST', type=str, help='2-column .conll file (w/o POS tags) test corpus', required=True)
 parser.add_argument('--output_dir', metavar='OUT', type=str, help='output directory for results', default='.')
+parser.add_argument('--restat', type=bool, help="rerun stats on existing collections of results", default=False)
 
 args = parser.parse_args()
 
-mkdir(args.output_dir)
+if (not args.restat):
+    mkdir(args.output_dir)
 
 word_count = int(check_output("egrep -v '^$' {} | wc -l".format(args.test_file), shell=True))
 
@@ -47,7 +49,7 @@ for tag in TAGSET:
     gold_pos[tag] = int(check_output("egrep '{}$' {} | wc -l".format(tag, args.test_file), shell=True))
     gold_neg[tag] = word_count - gold_pos[tag]
 
-sts_file = args.output_dir + "/results.stats"
+sts_file = args.output_dir + "/results.stats" + (".repaired" if args.restat else "") + ".csv"
 
 with open(sts_file, mode='w') as fp:
     fp.write("trial,k,n,backoff,heuristic,word_count,errors,")
@@ -66,9 +68,10 @@ with open(sts_file, mode='w') as fp:
                         out_file = file_prefix + ".conll"
                         err_file = file_prefix + ".err"
                         out_line = "{},{},{},{},{},".format(n, k, backoff, heur_abbr, trial)
-                        command="python3 hmmpos.py --training_file {} --test_file {} --n {} --k {} --ngram_{} --{} 1> {} 2> {}".format(args.training_file, args.test_file, n, k, backoff, heuristic, out_file, err_file)
-                        print(command)
-                        check_output(command, shell=True)
+                        if (not args.restat):
+                            command="python3 hmmpos.py --training_file {} --test_file {} --n {} --k {} --ngram_{} --{} 1> {} 2> {}".format(args.training_file, args.test_file, n, k, backoff, heuristic, out_file, err_file)
+                            print(command)
+                            check_output(command, shell=True)
                         errors = int(check_output("diff {} {} | egrep '<' | wc -l".format(args.test_file, out_file), shell=True))
                         fp.write("{},{},{},{},{},{},{},".format(trial, k, n, backoff, heuristic, word_count, errors))
                         for tag in TAGSET:
