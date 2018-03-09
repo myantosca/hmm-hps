@@ -52,7 +52,7 @@ sts_file = args.output_dir + "/results.stats"
 with open(sts_file, mode='w') as fp:
     fp.write("trial,k,n,backoff,heuristic,word_count,errors,")
     for tag in TAGSET:
-        fp.write("FP({}),FN({}),TP({}),TN({}),P({}),R({}),A({}),F1({})".format(tag, tag, tag, tag, tag, tag, tag, tag))
+        fp.write("FP({}),FN({}),TP({}),TN({}),P({}),R({}),A({}),F1({}),".format(tag, tag, tag, tag, tag, tag, tag, tag))
     fp.write("\n")
     # Repeated trials
     for trial in range(5):
@@ -80,5 +80,5 @@ with open(sts_file, mode='w') as fp:
                             recall    = 0 if true_pos + false_neg == 0 else float(true_pos) / float(true_pos + false_neg)
                             accuracy  = 0 if true_pos + false_pos + true_neg + false_neg == 0 else float(true_pos + true_neg) / float(true_pos + false_pos + true_neg + false_neg) 
                             f1measure = 0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
-                            fp.write("{},{},{},{},{},{},{},{}".format(false_pos, false_neg, true_pos, true_neg, precision, recall, accuracy, f1measure))
+                            fp.write("{},{},{},{},{},{},{},{},".format(false_pos, false_neg, true_pos, true_neg, precision, recall, accuracy, f1measure))
                         fp.write("\n")
