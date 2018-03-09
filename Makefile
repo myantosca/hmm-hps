@@ -3,6 +3,7 @@ FNAME_BASE=yantosca_COSC6336_assg_1
 all: doc srcdist
 
 srcdist:
+	@rm -rf ghostant
 	@mkdir -p ghostant
 	@cp src/hmmpos.py ghostant
 	@cp src/README.txt ghostant
