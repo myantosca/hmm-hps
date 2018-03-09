@@ -63,6 +63,16 @@ rapid development prototyping - back of the envelope accuracy measure with diff 
 
 \section{Experimental Results}
 
+\begin{alltt}
+  $N$ = \$(wc -l dataset/dev.conll)
+  $GP$ = \$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)
+  $GF$ = $N$ - $GF$
+  $FN$ = \$(diff dataset/dev.conll ../hw1-results/dev4.txt | egrep '<' | egrep '\emph{class}\$' | wc -l)
+  $FP$ = \$(diff dataset/dev.conll ../hw1-results/dev4.txt | egrep '>' | egrep '\emph{class}\$' | wc -l)
+  $TP = GP - FP$
+  $TN = GN - FN$
+\end{alltt}
+
 problems encountered:
 - bugs
 - failure to reproduce results with the same exec params
