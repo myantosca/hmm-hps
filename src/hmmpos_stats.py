@@ -73,7 +73,7 @@ with open(sts_file, mode='w') as fp:
                         fp.write("{},{},{},{},{},{},{},".format(trial, k, n, backoff, heuristic, word_count, errors))
                         for tag in TAGSET:
                             false_pos = int(check_output("diff {} {} | egrep '<' | egrep '{}$' | wc -l".format(args.test_file, out_file, tag), shell=True))
-                            false_neg = int(check_output("diff {} {} | egrep '<' | egrep '{}$' | wc -l".format(args.test_file, out_file, tag), shell=True))
+                            false_neg = int(check_output("diff {} {} | egrep '>' | egrep '{}$' | wc -l".format(args.test_file, out_file, tag), shell=True))
                             true_pos  = gold_pos[tag] - false_pos
                             true_neg  = gold_neg[tag] - false_neg
                             precision = 0 if true_pos + false_pos == 0 else float(true_pos) / float(true_pos + false_pos)
