@@ -47,10 +47,39 @@
 
 \section{Methodology}
 
-Frequency counter for arbitrary order n-gram
-Frequency to probability transform
-Viterbi decoding
-Laplace smoothing -> add-k smoothing on transition and emission probabilities
+\paragraph{Training}
+Initial development of the POS tagger began with building a frequency counter for
+arbitrary order n-grams encountered over the course of reading the training file.
+These n-grams included the $n$ pairs of words and corresponding language identification
+tags up to the current word being read. As each new word was encountered, each
+order of n-gram leading up to the word was counted. Preceding words and language ID
+tags were kept in a bounded cursor to minimize processing overhead. If the cursor
+was full when it encountered a new word, the oldest entry was excised so that the
+new entry could be introduced and tallied accordingly.
+\paragraph{}
+Once the training file had been read and the frequency model established,
+the frequency counts were converted to probabilities. At first, Laplace smoothing
+\cite{JurafskyMartin}
+with equiprobable weights was used to supply probability mass for out-of-vocabulary
+words and unseen state transitions, but this was ultimately generalized to add-$k$
+smoothing \cite{JurafskyMartin} to permit tuning based on empirical results.
+Other smoothing methods were briefly considered but rejected on account of the time
+involved to implement them given the schedule of the competition.
+
+\paragraph{}
+No attempt was made to store the model in a form that could be loaded later,
+so training was done online in the same execution run as the testing.
+Whereas this significantly slowed development velocity at the beginning,
+the addition of later refinements and the stream-processing approaches
+employed in both training and testing made this an acceptable cost.
+
+\paragraph{Testing}
+The testing phase employed the Viterbi decoding algorithm as given in Jurafsky and
+Martin \shortcite{JurafskyMartin}. To save on computation time and memory usage,
+a running $a_{max}$ value was kept in the innermost loop for determining each
+state's most likely predecessor.
+
+\paragraph{Refinements}
 Heuristic fallback
 Rudimentary interpolation, n-gram backoff
 Iterative refinement initially testing dev -> dev, then train -> dev
