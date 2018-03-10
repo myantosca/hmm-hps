@@ -253,31 +253,248 @@ the following values are defined:
 
 {\tiny
 \begin{align*}{}
-  WC =& \texttt{\$(wc -l dataset/dev.conll)} \\
-  GP =& \texttt{\$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)} \\
-  GF =& WC - GP \\
-  FN =& \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+  WC =&\ \texttt{\$(wc -l dataset/dev.conll)} \\
+  GP =&\ \texttt{\$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)} \\
+  GF =&\ WC - GP \\
+  FN =&\ \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
      &\  \texttt{egrep '<' | egrep '\emph{class}\$' | wc -l)} \\
-  FP =& \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+  FP =&\ \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
      &\  \texttt{egrep '>' | egrep '\emph{class}\$' | wc -l)} \\
-  TP =& GP - FP \\
-  TN =& GN - FN
+  TP =&\ GP - FP \\
+  TN =&\ GN - FN
 \end{align*}}
 
 \paragraph{}
-problems encountered:
-- bugs
-- failure to reproduce results with the same exec params
--- first of equiprobable come, first serve
-- float\_info.min vs. -float\_info.max (relevant when swapping to log prob)
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Precision (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\pmicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\pmicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\pmicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\pmicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\pmicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\pmicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
 
-with heuristic fallback vs. without
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\pmicro}}
 
-add-k smoothing (varying k)
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Recall (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\rmicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\rmicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\rmicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\rmicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\rmicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\rmicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
 
-backoff vs. rudimentary interpolation
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\rmicro}}
 
-varying n-gram order
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Accuracy (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\amicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\amicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\amicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\amicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\amicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\amicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\amicro}}
+
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=F1 Measure (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\fmicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\fmicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\fmicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\fmicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\fmicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\fmicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\fmicro}}
+
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Precision (Macro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\pmacro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\pmacro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\pmacro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\pmacro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\pmacro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\pmacro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\pmacro}}
+
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Recall (Macro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\rmacro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\rmacro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\rmacro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\rmacro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\rmacro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\rmacro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\rmacro}}
+
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Accuracy (Macro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\amacro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\amacro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\amacro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\amacro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\amacro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\amacro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\amacro}}
+
+\paragraph{}
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.05,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=F1 Measure (Macro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\fmacro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\fmacro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\fmacro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\fmacro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\fmacro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\fmacro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+  {\tiny\pgfplotstabletypeset[header=true]{\fmacro}}
 
 \section{Conclusions}
 
