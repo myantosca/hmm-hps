@@ -58,6 +58,13 @@ order of n-gram leading up to the word was counted. Preceding words and language
 tags were kept in a bounded cursor to minimize processing overhead. If the cursor
 was full when it encountered a new word, the oldest entry was excised so that the
 new entry could be introduced and tallied accordingly.
+
+\paragraph{}
+Additionally, the count of each annotated POS tag was recorded, along with the count
+of the transition from the previously seen POS tag. At the beginning of a sentence,
+an implicit \texttt{Q0} tag served as the origin of the transition, and at the end
+of a sentence, an implicit textttt{QF} tag served as the terminus of the transition.
+
 \paragraph{}
 Once the training file had been read and the frequency model established,
 the frequency counts were converted to probabilities. At first, Laplace smoothing
@@ -75,23 +82,118 @@ Whereas this significantly slowed development velocity at the beginning,
 the addition of later refinements and the stream-processing approaches
 employed in both training and testing made this an acceptable cost.
 
+\paragraph{}
+It should be noted that all training was done with the provided \texttt{train.conll}.
+On account of time constraints, more sophisticated methods of cross-validation
+were not employed.
+
 \paragraph{Testing}
 The testing phase employed the Viterbi decoding algorithm as given in Jurafsky and
 Martin \shortcite[131-134]{JurafskyMartin}. To save on computation time and memory usage,
 a running $a_{max}$ value was kept in the innermost loop for determining each
 state's most likely predecessor.
 
-\paragraph{Refinements}
-Heuristic fallback
-Rudimentary interpolation, n-gram backoff
-Iterative refinement initially testing dev -> dev, then train -> dev
-moved to log probabilities
-Heuristic preseed
-integration of heuristic intuitions earlier in pipeline afforded performance boost in decoding by not having to do heuristic checks all the time (wider feature set)/caveat: probability mass not redistributed in all cases
-N-gram weight adjustment
-Five submissions to the competition
+\paragraph{}
+To gauge efficacy of the tagger during development and enable rapid prototyping,
+a rough measure of precision was taken via the following shell command:
 
-rapid development prototyping - back of the envelope accuracy measure with diff <1> <2> | egrep '<' | wc -l
+\begin{alltt}
+  \tiny{diff dev.conll <output file> | egrep '<' | wc -l}
+\end{alltt}
+
+\paragraph{}
+All development testing prior to submission was done with the provided
+\texttt{dev.conll}, and this drove decisions on refining and tuning the model.
+Submissions to the competition were only trained with \texttt{train.conll}.
+
+\paragraph{Refinements}
+After the first pass of the tagger pipeline was completed, it was clear that it would
+not be able to compete effectively on its own. Rough estimates of precision from
+initial assays against the \texttt{dev.conll} ran around 0.81, which was below the
+Naive Bayes submission to the competition by the user with the handle blackbishop.
+Incorporating some of the ideas given by Dr. Solorio during lecture on February, 28, 2018,
+a heuristic fallback step was introduced in the decoding phase for unknown vocabulary.
+
+\paragraph{}
+The heuristic fallback employed regular expressions to capture whether the unigram
+in the emission was capitalized, contained only punctuation marks, or only alphanumeric
+characters. In the capitalization case, the fallback emission probability was zeroed out
+for every class except \texttt{PROPN}. In the case where only punctuation marks were
+present, the fallback emission probability was zeroed out for every class except
+\texttt{PUNCT}. In the case where only alphanumeric characters were present, the fallback
+emission probabilities for $P(word|\texttt{PUNCT})$ and $P(word|\texttt{SYM})$ were
+zeroed out.
+
+\paragraph{}
+This simple heuristic check was done as it was noticed that many clearly nominal or
+verbal tokens were being labeled as \texttt{PUNCT}, and it performed as expected,
+raising the correctness of the output, if not perfectly preserving the probability masses
+involved. Adding this refinement also incurred a massive performance penalty since
+the series of branching if-statements became quadratic with respect to $Q$, the set
+of possible generating POS states.
+
+\paragraph{}
+After the addition of heuristic fallback, attention was turned to combining the
+emission probabilities of different orders of n-grams. Two modes of operation were
+implemented to achieve this: backoff and interpolation. The backoff mode simply backed off
+to increasingly lower orders of n-grams from the highest order stored by the model until
+it reached the unigram order. If the model had not seen the token, it would fall back
+to a special unknown token encoded as \texttt{<UNK>} that had been seeded with smoothed
+probabilities if one of the heuristic fallback cases did not apply.
+
+\paragraph{}
+The interpolation mode was implemented in a rudimentary fashion. The highest order n-gram
+would receive a weight of 0.5, the (n-1)-gram would receive half of the remaining weight, and so on until the unigram observation. If any of the n-grams had not been seen, its
+contribution would fall back to the heuristic fallback unigram of \texttt{<UNK>}.
+At the beginnings of sentences and in sentences shorter than the highest order n-gram
+in the model, no phantom n-grams were computed. The interpolation chain would start with
+the longest observed n-gram and apply the formula in the same manner.
+
+\paragraph{}
+An issue was encountered in the dev set with a sentence composed of 91 tokens. A numerical
+underflow in the multiplication of probabilities during the decoding phase led to a state
+where the backpointers could not be traversed since they would only be assigned if a
+preceding state had greater than zero probability, the initial value of the $a_{max}$
+cursor. To counter this, a major refactoring of the code was done to store and use
+the logarithm of the various probabilities calculated and multiplication operations
+were changed to addition. To provide the same effect in log space, the value zero
+was replaced with $-\texttt{sys.float\_info.max}$.
+
+\paragraph{}
+Since the abysmal execution speed  of the heuristic fallback put a drag on development time,
+the heuristic intuitions were integrated earlier in the pipeline by preseeding the
+emission probabilities that corresponded to the various heuristic checks. Three
+heuristic check responses were encoded in each observation key, and the regular
+expression match that provided the key was calculated once upon ingestion during
+the decoding phase. The three features that were added to the word and language ID
+as part of the observation were as follows:
+
+\itemize
+\item{\texttt{SOME\_WORD}: at least one alphanumeric character}
+\item{\texttt{CAP}: capitalized alphanumeric followed by alphanumeric}
+\item{\texttt{ALL\_PUNCT}: only punctuation characters }
+
+\paragraph{}
+This provided a significant performance boost that enabled development to progress
+more swiftly while maintaining the same level of precision. Some attempts were made to
+redistribute the probability mass appropriately, but in most cases heuristic downgrades
+and upgrades during the conversion of frequencies to probabilities were done unilaterally
+for the sake of time.
+
+\paragraph{}
+Furthermore, the iterative decay of significance in the weights for the rough
+interpolation of multiple orders of n-grams was modified to give more credence
+to higher-order n-grams. Instead of $\frac{1}{2}$ of the remaining weight, each n-gram
+in the chain would receive $\frac{3}{4}$ of the remaining weight.
+
+\paragraph{}
+As a final step, emission probabilities for POS states \texttt{INTJ}, \texttt{UNK},
+and \texttt{X} were downgraded for unknown words that matched the \texttt{SOME\_WORD}
+feature. This was done as a result of observations that these tags seemed to be
+disproportionately assigned in pre-submission test runs on \texttt{dev.conll}.
+The decision was made in the full understanding of the risk of overfitting on the
+admittedly unfounded presumption that unknown ``dictionary'' words would be far more
+likely to turn up in a corpus than novel interjections.
 
 \section{Experimental Results}
 
