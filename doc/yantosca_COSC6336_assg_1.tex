@@ -1,5 +1,5 @@
 %
-% File naaclhlt2018.tex
+% File yantosca_COSC6336_assg_1.tex
 %
 %% Based on the style files for NAACL-HLT 2018, which were
 %% Based on the style files for ACL-2015, with some improvements
@@ -20,6 +20,27 @@
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{amssymb}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\pgfplotsset{
+  tick label style={font=\tiny},
+  label style={font=\footnotesize},
+  legend style={font=\tiny},
+  compat=newest,
+  empty line=scanline
+}
+\pgfplotstableset{
+  col sep=comma,
+}
+
+\pgfplotstableread{./pmicro.csv}\pmicro
+\pgfplotstableread{./rmicro.csv}\rmicro
+\pgfplotstableread{./amicro.csv}\amicro
+\pgfplotstableread{./f1micro.csv}\fmicro
+\pgfplotstableread{./pmacro.csv}\pmacro
+\pgfplotstableread{./rmacro.csv}\rmacro
+\pgfplotstableread{./amacro.csv}\amacro
+\pgfplotstableread{./f1macro.csv}\fmacro
 
 \aclfinalcopy % Uncomment this line for the final submission
 %\def\aclpaperid{***} %  Enter the acl Paper ID here
