@@ -10,10 +10,8 @@ srcdist:
 	@cp -r dataset ghostant
 	@tar cvzf yantosca_COSC6336_assg_1.tar.gz ghostant
 
-doc: doc/$(FNAME_BASE).pdf
-
-%.pdf: %.tex %.bib
-	@lualatex -shell-escape --output-directory=doc $*.tex
+doc: .EMPTY
+	@make -C doc
 
 superclean: clean superclean-doc-$(FNAME_BASE)
 
@@ -42,3 +40,5 @@ clean-doc-%:
 	@rm -f doc/$*.nav
 	@rm -rf doc/_minted-$*
 	@rm -f doc/*~
+
+.EMPTY:
