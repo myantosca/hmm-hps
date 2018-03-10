@@ -197,21 +197,48 @@ likely to turn up in a corpus than novel interjections.
 
 \section{Experimental Results}
 
-\begin{alltt}
-  $N$ = \$(wc -l dataset/dev.conll)
-  $GP$ = \$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)
-  $GF$ = $N$ - $GF$
-  $FN$ = \$(diff dataset/dev.conll ../hw1-results/dev4.txt | egrep '<' | egrep '\emph{class}\$' | wc -l)
-  $FP$ = \$(diff dataset/dev.conll ../hw1-results/dev4.txt | egrep '>' | egrep '\emph{class}\$' | wc -l)
-  $TP = GP - FP$
-  $TN = GN - FN$
-\end{alltt}
+\paragraph{Competition Submissions}
+Results from submissions to the competition from training on \texttt{train.conll}
+and testing on \texttt{test.conll} were as follows:
 
+\paragraph{}
+{\small
+\begin{tabular}{llll}
+  Accuracy & $n$ & $k$ & Heuristic \\
+  0.9181 & 1 & 1 & fallback\footnote{Regular probabilities.} \\
+  0.9352 & 1 & 0.01 & fallback\footnote{Log-space probabilities hereafter.} \\
+  0.9347 & 2 & 0.05 & preseed \\
+  0.9349 & 1 & 0.01 & preseed \\
+  0.9355 & 4 & 0.01 & preseed, revised weights
+\end{tabular}}
+
+\paragraph{Local Experimentation}
+While the competition submissions exhibited decent overall accuracy,
+a more thorough examination of the model's performance in
+terms of accuracy, precision, recall, and F1 measure controlling
+for certain parameters would provide a more incisive inquiry
+into the strengths and weaknesses of this hybrid heuristic HMM approach.
+In the interest of ensuring clarity in the derivation of these measures,
+the following values are defined:
+
+{\tiny
+\begin{align*}{}
+  WC =& \texttt{\$(wc -l dataset/dev.conll)} \\
+  GP =& \texttt{\$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)} \\
+  GF =& WC - GP \\
+  FN =& \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+     &\  \texttt{egrep '<' | egrep '\emph{class}\$' | wc -l)} \\
+  FP =& \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+     &\  \texttt{egrep '>' | egrep '\emph{class}\$' | wc -l)} \\
+  TP =& GP - FP \\
+  TN =& GN - FN
+\end{align*}}
+
+\paragraph{}
 problems encountered:
 - bugs
 - failure to reproduce results with the same exec params
 -- first of equiprobable come, first serve
-- numerical underflow
 - float\_info.min vs. -float\_info.max (relevant when swapping to log prob)
 
 with heuristic fallback vs. without
