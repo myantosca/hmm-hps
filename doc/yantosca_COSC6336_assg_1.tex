@@ -59,10 +59,10 @@ new entry could be introduced and tallied accordingly.
 \paragraph{}
 Once the training file had been read and the frequency model established,
 the frequency counts were converted to probabilities. At first, Laplace smoothing
-\cite{JurafskyMartin}
+\cite[47]{JurafskyMartin}
 with equiprobable weights was used to supply probability mass for out-of-vocabulary
 words and unseen state transitions, but this was ultimately generalized to add-$k$
-smoothing \cite{JurafskyMartin} to permit tuning based on empirical results.
+smoothing \cite[49]{JurafskyMartin} to permit tuning based on empirical results.
 Other smoothing methods were briefly considered but rejected on account of the time
 involved to implement them given the schedule of the competition.
 
@@ -75,7 +75,7 @@ employed in both training and testing made this an acceptable cost.
 
 \paragraph{Testing}
 The testing phase employed the Viterbi decoding algorithm as given in Jurafsky and
-Martin \shortcite{JurafskyMartin}. To save on computation time and memory usage,
+Martin \shortcite[131-134]{JurafskyMartin}. To save on computation time and memory usage,
 a running $a_{max}$ value was kept in the innermost loop for determining each
 state's most likely predecessor.
 
