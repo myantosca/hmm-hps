@@ -84,7 +84,9 @@ new entry could be introduced and tallied accordingly.
 Additionally, the count of each annotated POS tag was recorded, along with the count
 of the transition from the previously seen POS tag. At the beginning of a sentence,
 an implicit \texttt{Q0} tag served as the origin of the transition, and at the end
-of a sentence, an implicit textttt{QF} tag served as the terminus of the transition.
+of a sentence, an implicit \texttt{QF} tag served as the terminus of the transition.
+The explicit tag definitions in the training corpus employed the Universal Dependencies
+tagset \cite{UPOS}.
 
 \paragraph{}
 Once the training file had been read and the frequency model established,
@@ -105,7 +107,7 @@ employed in both training and testing made this an acceptable cost.
 
 \paragraph{}
 It should be noted that all training was done with the provided \texttt{train.conll}.
-On account of time constraints, more sophisticated methods of cross-validation
+On account of time constraints, more sophisticated methods of cross-validation \cite[86-87]{JurafskyMartin}
 were not employed.
 
 \paragraph{Testing}
@@ -130,9 +132,9 @@ Submissions to the competition were only trained with \texttt{train.conll}.
 \paragraph{Refinements}
 After the first pass of the tagger pipeline was completed, it was clear that it would
 not be able to compete effectively on its own. Rough estimates of precision from
-initial assays against the \texttt{dev.conll} ran around 0.81, which was below the
-Naive Bayes submission to the competition by the user with the handle blackbishop.
-Incorporating some of the ideas given by Dr. Solorio during lecture on February, 28, 2018,
+initial assays against \texttt{dev.conll} ran around 0.81, which was below the
+Naive Bayes competition submission made by the user blackbishop.
+Incorporating some of the ideas expressed by Dr. Solorio during lecture on February, 28, 2018,
 a heuristic fallback step was introduced in the decoding phase for unknown vocabulary.
 
 \paragraph{}
@@ -147,7 +149,7 @@ zeroed out.
 
 \paragraph{}
 This simple heuristic check was done as it was noticed that many clearly nominal or
-verbal tokens were being labeled as \texttt{PUNCT}, and it performed as expected,
+verbal tokens were being labeled as \texttt{PUNCT}. The refinement performed as expected,
 raising the correctness of the output, if not perfectly preserving the probability masses
 involved. Adding this refinement also incurred a massive performance penalty since
 the series of branching if-statements became quadratic with respect to $Q$, the set
@@ -156,15 +158,17 @@ of possible generating POS states.
 \paragraph{}
 After the addition of heuristic fallback, attention was turned to combining the
 emission probabilities of different orders of n-grams. Two modes of operation were
-implemented to achieve this: backoff and interpolation. The backoff mode simply backed off
-to increasingly lower orders of n-grams from the highest order stored by the model until
-it reached the unigram order. If the model had not seen the token, it would fall back
-to a special unknown token encoded as \texttt{<UNK>} that had been seeded with smoothed
-probabilities if one of the heuristic fallback cases did not apply.
+implemented to achieve this: backoff and interpolation \cite[49-50]{JurafskyMartin}.
+The backoff mode simply backed off to increasingly lower orders of n-grams from the
+highest order stored by the model until it reached the unigram order.
+If the model had not seen the token, it would fall back to a special unknown token
+encoded as \texttt{<UNK>} that had been seeded with smoothed probabilities if one
+of the heuristic fallback cases did not apply.
 
 \paragraph{}
 The interpolation mode was implemented in a rudimentary fashion. The highest order n-gram
-would receive a weight of 0.5, the (n-1)-gram would receive half of the remaining weight, and so on until the unigram observation. If any of the n-grams had not been seen, its
+would receive a weight of 0.5, the (n-1)-gram would receive half of the remaining weight,
+and so on until the unigram observation. If any of the n-grams had not been seen, its
 contribution would fall back to the heuristic fallback unigram of \texttt{<UNK>}.
 At the beginnings of sentences and in sentences shorter than the highest order n-gram
 in the model, no phantom n-grams were computed. The interpolation chain would start with
@@ -205,7 +209,7 @@ for the sake of time.
 Furthermore, the iterative decay of significance in the weights for the rough
 interpolation of multiple orders of n-grams was modified to give more credence
 to higher-order n-grams. Instead of $\frac{1}{2}$ of the remaining weight, each n-gram
-in the chain would receive $\frac{3}{4}$ of the remaining weight.
+in the chain received $\frac{3}{4}$ of the remaining weight.
 
 \paragraph{}
 As a final step, emission probabilities for POS states \texttt{INTJ}, \texttt{UNK},
@@ -213,8 +217,13 @@ and \texttt{X} were downgraded for unknown words that matched the \texttt{SOME\_
 feature. This was done as a result of observations that these tags seemed to be
 disproportionately assigned in pre-submission test runs on \texttt{dev.conll}.
 The decision was made in the full understanding of the risk of overfitting on the
-admittedly unfounded presumption that unknown ``dictionary'' words would be far more
-likely to turn up in a corpus than novel interjections.
+presumption that unknown ``dictionary'' words would be far more likely to turn up
+in a corpus than novel interjections owing to the former's richer semantic content.
+This intuition is borne out when taking a cursory glance at other corpora \cite{WFD100K}
+used in POS tagging research \cite{CLAWS7} \cite{BrysbaertNewKeuleers}. For example,
+sampling every twentieth word from the list of 100,000 words based on the 450 million word
+Corpus of Contemporary American English (COCA) yields a mere four interjections in the set of
+5,000, the most frequent being ``goodbye'' with a frequency ranking of 9,200 out of 100,000 \cite{COCA5K}.
 
 \section{Experimental Results}
 
