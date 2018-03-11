@@ -227,48 +227,64 @@ Corpus of Contemporary American English (COCA) yields a mere four interjections 
 
 \section{Experimental Results}
 
-\paragraph{Competition Submissions}
+\subsection{Competition Submissions}
 Results from submissions to the competition from training on \texttt{train.conll}
-and testing on \texttt{test.conll} were as follows:
+and testing on \texttt{test.conll} were as follows\footnote{The first submission used regular probabilities. Log-space probabilities were used for all other submissions.}:
 
 \paragraph{}
 {\small
 \begin{tabular}{llll}
   Accuracy & $n$ & $k$ & Heuristic \\
-  0.9181 & 1 & 1 & fallback\footnote{Regular probabilities.} \\
-  0.9352 & 1 & 0.01 & fallback\footnote{Log-space probabilities hereafter.} \\
+  0.9181 & 1 & 1 & fallback \\
+  0.9352 & 1 & 0.01 & fallback \\
   0.9347 & 2 & 0.05 & preseed \\
   0.9349 & 1 & 0.01 & preseed \\
   0.9355 & 4 & 0.01 & preseed, revised weights
 \end{tabular}}
 
-\paragraph{Local Experimentation}
+\subsection{Local Experimentation}
 While the competition submissions exhibited decent overall accuracy,
 a more thorough examination of the model's performance in
-terms of accuracy, precision, recall, and F1 measure controlling
-for certain parameters would provide a more incisive inquiry
+terms of accuracy, precision, recall, and $F_{1}$-measure \cite[83-84]{JurafskyMartin}
+controlling for certain parameters would provide a more incisive inquiry
 into the strengths and weaknesses of this hybrid heuristic HMM approach.
 In the interest of ensuring clarity in the derivation of these measures,
-the following values are defined:
+the following values are defined on a per-class basis:
 
 {\tiny
 \begin{align*}{}
-  WC =&\ \texttt{\$(wc -l dataset/dev.conll)} \\
+  WC =&\ \texttt{\$(egrep -v '\^\$' dev.conll | wc -l)} \\
   GP =&\ \texttt{\$(egrep '\emph{class}\$' dataset/dev.conll | wc -l)} \\
-  GF =&\ WC - GP \\
-  FN =&\ \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+  GN =&\ WC - GP \\
+  FN =&\ \texttt{\$(diff dev.conll ../hw1-results/dev4.txt | } \\
      &\  \texttt{egrep '<' | egrep '\emph{class}\$' | wc -l)} \\
-  FP =&\ \texttt{\$(diff dataset/dev.conll ../hw1-results/dev4.txt | } \\
+  FP =&\ \texttt{\$(diff dev.conll ../hw1-results/dev4.txt | } \\
      &\  \texttt{egrep '>' | egrep '\emph{class}\$' | wc -l)} \\
   TP =&\ GP - FP \\
   TN =&\ GN - FN
 \end{align*}}
 
 \paragraph{}
+The per-class statistics were composited using both micro-averaging
+and macro-averaging. The composite results are given in the
+following graphs and tables.
+
+\paragraph{Precision}
+The micro-averaged precision matches very nearly the rough performance
+characteristic that drove development. Precision decreased as
+the constant used for add-$k$ smoothing increased, which is to be
+expected given that the probabilities for heretofore unseen
+observations were equiprobable except in cases where they were
+overridden by heuristic measures. The performance of the system
+lags well behind even simple naive Bayes systems when heuristic
+methods are not employed, but using the weighted interpolation
+with a small $k$ constant seems to minimize the occurrence of
+false positives.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
-      bar width=0.05,
+      bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
       xtick=data,
@@ -290,101 +306,19 @@ the following values are defined:
   \end{axis}
 \end{tikzpicture}
 
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\pmicro}}
+{\tiny\pgfplotstabletypeset[header=true]{\pmicro}}
 
-\paragraph{}
+Conversely, the macro-averaged precision values are significantly lower.
+The holistic precision of the system may be well-suited to the task
+and particularly the training and dev sets, but these results suggest
+that a few predominant classes in which the system performs well
+are masking the poor performance in the case of less frequently occurring
+POS tags.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
-      bar width=0.05,
-      legend style={at={(0.5,-0.15)},
-        anchor=north,legend columns=-1},
-      xtick=data,
-      point meta=explicit symbolic,
-      title=Recall (Micro-averaged)
-    ]
-    \addplot table [x=n,y=bfb,meta=k] {\rmicro};
-    \addlegendentry{bfb};
-    \addplot table [x=n,y=bps,meta=k] {\rmicro};
-    \addlegendentry{bps};
-    \addplot table [x=n,y=bnh,meta=k] {\rmicro};
-    \addlegendentry{bnh};
-    \addplot table [x=n,y=wfb,meta=k] {\rmicro};
-    \addlegendentry{wfb};
-    \addplot table [x=n,y=wps,meta=k] {\rmicro};
-    \addlegendentry{wps};
-    \addplot table [x=n,y=wnh,meta=k] {\rmicro};
-    \addlegendentry{wnh};
-  \end{axis}
-\end{tikzpicture}
-
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\rmicro}}
-
-\paragraph{}
-\begin{tikzpicture}
-  \begin{axis}
-    [ ybar,
-      bar width=0.05,
-      legend style={at={(0.5,-0.15)},
-        anchor=north,legend columns=-1},
-      xtick=data,
-      point meta=explicit symbolic,
-      title=Accuracy (Micro-averaged)
-    ]
-    \addplot table [x=n,y=bfb,meta=k] {\amicro};
-    \addlegendentry{bfb};
-    \addplot table [x=n,y=bps,meta=k] {\amicro};
-    \addlegendentry{bps};
-    \addplot table [x=n,y=bnh,meta=k] {\amicro};
-    \addlegendentry{bnh};
-    \addplot table [x=n,y=wfb,meta=k] {\amicro};
-    \addlegendentry{wfb};
-    \addplot table [x=n,y=wps,meta=k] {\amicro};
-    \addlegendentry{wps};
-    \addplot table [x=n,y=wnh,meta=k] {\amicro};
-    \addlegendentry{wnh};
-  \end{axis}
-\end{tikzpicture}
-
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\amicro}}
-
-\paragraph{}
-\begin{tikzpicture}
-  \begin{axis}
-    [ ybar,
-      bar width=0.05,
-      legend style={at={(0.5,-0.15)},
-        anchor=north,legend columns=-1},
-      xtick=data,
-      point meta=explicit symbolic,
-      title=F1 Measure (Micro-averaged)
-    ]
-    \addplot table [x=n,y=bfb,meta=k] {\fmicro};
-    \addlegendentry{bfb};
-    \addplot table [x=n,y=bps,meta=k] {\fmicro};
-    \addlegendentry{bps};
-    \addplot table [x=n,y=bnh,meta=k] {\fmicro};
-    \addlegendentry{bnh};
-    \addplot table [x=n,y=wfb,meta=k] {\fmicro};
-    \addlegendentry{wfb};
-    \addplot table [x=n,y=wps,meta=k] {\fmicro};
-    \addlegendentry{wps};
-    \addplot table [x=n,y=wnh,meta=k] {\fmicro};
-    \addlegendentry{wnh};
-  \end{axis}
-\end{tikzpicture}
-
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\fmicro}}
-
-\paragraph{}
-\begin{tikzpicture}
-  \begin{axis}
-    [ ybar,
-      bar width=0.05,
+      bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
       xtick=data,
@@ -406,14 +340,49 @@ the following values are defined:
   \end{axis}
 \end{tikzpicture}
 
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\pmacro}}
+{\tiny\pgfplotstabletypeset[header=true]{\pmacro}}
 
-\paragraph{}
+\paragraph{Recall}
+The results for micro-averaged recall approximate the
+results observed for micro-averaged precision. Taken as a
+whole, the system does not seem to be excessively prone to
+false negatives.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
-      bar width=0.05,
+      bar width=0.0625,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=Recall (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\rmicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\rmicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\rmicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\rmicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\rmicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\rmicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+{\tiny\pgfplotstabletypeset[header=true]{\rmicro}}
+
+Once again, however, the macro-averaged recall indicates
+that there are certain underrepresented classes where the
+occurrence of false negatives is high.
+
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
       xtick=data,
@@ -435,43 +404,88 @@ the following values are defined:
   \end{axis}
 \end{tikzpicture}
 
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\rmacro}}
+{\tiny\pgfplotstabletypeset[header=true]{\rmacro}}
 
-\paragraph{}
+\paragraph{Accuracy}
+No distinction is made between micro-averaging and macro-averaging
+of accuracy since the results are mathematically the same.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
-      bar width=0.05,
+      bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
       xtick=data,
       point meta=explicit symbolic,
-      title=Accuracy (Macro-averaged)
+      title=Accuracy
     ]
-    \addplot table [x=n,y=bfb,meta=k] {\amacro};
+    \addplot table [x=n,y=bfb,meta=k] {\amicro};
     \addlegendentry{bfb};
-    \addplot table [x=n,y=bps,meta=k] {\amacro};
+    \addplot table [x=n,y=bps,meta=k] {\amicro};
     \addlegendentry{bps};
-    \addplot table [x=n,y=bnh,meta=k] {\amacro};
+    \addplot table [x=n,y=bnh,meta=k] {\amicro};
     \addlegendentry{bnh};
-    \addplot table [x=n,y=wfb,meta=k] {\amacro};
+    \addplot table [x=n,y=wfb,meta=k] {\amicro};
     \addlegendentry{wfb};
-    \addplot table [x=n,y=wps,meta=k] {\amacro};
+    \addplot table [x=n,y=wps,meta=k] {\amicro};
     \addlegendentry{wps};
-    \addplot table [x=n,y=wnh,meta=k] {\amacro};
+    \addplot table [x=n,y=wnh,meta=k] {\amicro};
     \addlegendentry{wnh};
   \end{axis}
 \end{tikzpicture}
 
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\amacro}}
+{\tiny\pgfplotstabletypeset[header=true]{\amicro}}
 
-\paragraph{}
+The results observed here appear superficially impressive,
+but the abnormally high values point to an overfitting in the model.
+This becomes immediately apparent when one compares the individual
+values of the accuracy in the different classes. For instance,
+the \texttt{PUNCT} class boasts of accuracy measures as high
+as 0.9997 with heuristic provisions, but only 0.8782 without
+fallback or preseeding. And yet, the overall accuracy even without
+heuristic support is well above the 97th percentile in all cases.
+The empirical results here corroborate Jurafsky and Martin \shortcite[83-84]{JurafskyMartin}
+in decrying accuracy as a useful statistic.
+
+\paragraph{$F_{1}$-Measure}
+
+Since $F$-measure is a function of precision and recall, the results are
+similar for those observed for precision and recall but are included
+here for completeness. It succinctly captures in one measure the
+inherent weaknesses of the model.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
-      bar width=0.05,
+      bar width=0.0625,
+      legend style={at={(0.5,-0.15)},
+        anchor=north,legend columns=-1},
+      xtick=data,
+      point meta=explicit symbolic,
+      title=F1 Measure (Micro-averaged)
+    ]
+    \addplot table [x=n,y=bfb,meta=k] {\fmicro};
+    \addlegendentry{bfb};
+    \addplot table [x=n,y=bps,meta=k] {\fmicro};
+    \addlegendentry{bps};
+    \addplot table [x=n,y=bnh,meta=k] {\fmicro};
+    \addlegendentry{bnh};
+    \addplot table [x=n,y=wfb,meta=k] {\fmicro};
+    \addlegendentry{wfb};
+    \addplot table [x=n,y=wps,meta=k] {\fmicro};
+    \addlegendentry{wps};
+    \addplot table [x=n,y=wnh,meta=k] {\fmicro};
+    \addlegendentry{wnh};
+  \end{axis}
+\end{tikzpicture}
+
+{\tiny\pgfplotstabletypeset[header=true]{\fmicro}}
+
+\begin{tikzpicture}
+  \begin{axis}
+    [ ybar,
+      bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
       xtick=data,
@@ -493,18 +507,62 @@ the following values are defined:
   \end{axis}
 \end{tikzpicture}
 
-\paragraph{}
-  {\tiny\pgfplotstabletypeset[header=true]{\fmacro}}
+{\tiny\pgfplotstabletypeset[header=true]{\fmacro}}
 
 \section{Conclusions}
 
-training set too sparse in higher-order n-grams to be of much use
-most accurate in 1-grams controlling for other variables until adjusted n-gram weights, at which point higher-order n-grams provided better accuracy (up to 4, then decay?)
-decreasing k increased accuracy for dev and test sets, but may not apply in cases with many new unknown vocab
-better interpolation, proper selection of lambda factors
-better smoothing (i.e., more intelligent distribution of prob mass over unknowns)
-lookahead: function of multi-class words often dependent on following context, not only preceding
-future work: transfer of language ID to state instead of feature
+While the system performed relatively favorably in the competition,
+the faults in the system strongly recommend a refactoring of certain
+key components. The small training set size commended itself to the
+use of heuristics, but better performance on a purely probabilistic
+basis might have been achieved with a more comprehensive set of
+training data. A more rigorous examination of the proper redistribution
+of probability mass is required at a minimum.
+
+\paragraph{}
+Until the final refinements, the system was most precise with an
+observation order of 1, i.e., with unigrams. The original expectation
+was that increasing the observation order would increase the precision
+of the system, but the sparsity of the higher-order n-grams may have
+rendered increasing the order parameter of the model useless except
+for all but the most common idioms.
+
+\paragraph{}
+It was observed that decreasing the $k$ smoothing constant increased
+precision in the scenarios tested during development, but the strategy
+may not apply in cases with a large unknown vocabulary. The equiprobable
+distribution engendered by naive add-k smoothing does not reflect the actual
+distribution of POS tags in a given language and necessitated the addition
+of heuristic support. A more sophisticated approach to smoothing using a held-out
+corpus to determine a more realistic distribution for unknown vocabulary
+would likely yield better results with less semi-manual intervention.
+By the same token, interpolation could have been improved by determining weights
+from an empirically derived and cross-validated battery of tests against a collection
+of held-out corpora rather than the simple iterative remainder method that was employed.
+
+\paragraph{}
+Furthermore, future efforts would likely do well to attempt a morphological deconstruction
+of observations during training since lexemes are not necessarily atomic. Key components
+of function are encoded in all manners of inflection which could be leveraged to provide
+more granular feature determination.
+
+\paragraph{}
+For all of the issues with the implementation as presented, there is an even more
+fundamental weakness in the HMM approach in general. The Markov assumption that
+the probability of a whole sequence can be estimated by immediate predecessors
+fails to account for situations in which subsequent context determines the syntactic
+relationship of words heretofore, such as in languages that employ postpositions,
+or situations in which vital antecedent context precedes the current state by more
+than what may be economical to store, such as in topic-prominent languages.
+
+\paragraph{}
+To this end, it may be worthwhile to investigate strategies that employ lookahead tactics
+like skip-grams or to transfer the encoding of language ID into the state transition matrix
+rather than the observation matrix to more readily account for cases in which the syntax of
+the two or more languages in a code-switched corpus follow a different transitional graph,
+such as the adjective-noun noun-adjective dichotomy between English and Spanish.
+Enriching the POS transition graph may even yield some insights, at least on a syntactic
+level into the nature of code-switching itself.
 
 \section*{Acknowledgments}
 
@@ -512,7 +570,9 @@ The author wishes to acknowledge Dr. Thamar Solorio for heuristic feature sugges
 lecture on February 28, 2018; the NAACL template authors for providing a ready-made
 {\LaTeX} template; and Dr. Daniel Jurafsky and Dr. James H. Martin for succinctly laying out the
 properties and implementation of hidden Markov Models in the 3rd edition draft of their
-text \emph{Speech and Language Processing}.
+text \emph{Speech and Language Processing}. The author further wishes to acknowledge
+Dorothea Yantosca for her indispensable design criticism on the graphs and tables
+which appear in this paper.
 
 \bibliography{yantosca_COSC6336_assg_1}
 \bibliographystyle{acl_natbib}
