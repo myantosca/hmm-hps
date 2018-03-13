@@ -64,9 +64,34 @@
 \begin{document}
 \maketitle
 \begin{abstract}
+  Despite their simplicity, Hidden Markov Models can often
+  provide surprisingly accurate predictions for tasks such
+  as part-of-speech tagging. By adding the results of
+  heuristic functions against given observations to the
+  observed feature vector and preseeding the probability
+  matrices of the model accordingly, the accuracy of the
+  model can be substantially improved even training
+  against small corpora.
 \end{abstract}
 
 \section{Introduction}
+
+\paragraph{}
+Part-of-speech (POS) tagging, i.e., the annotation of words in linguistic corpora with syntactic
+markers, serves a crucial role in the natural language processing pipeline as it provides
+a syntactic skeleton without which proper semantic analysis downstream would prove extremely difficult.
+However, the process of tagging is labor intensive, and as corpora have grown, the desire
+for expediting the process has driven development of automated POS taggers. Early implementations
+employed rule-based methods, but such approaches tended not to scale in the general case.
+
+\paragraph{}
+Alternative approaches using Hidden Markov Models (HMMs) to model a generative probability
+distribution whereby state transitions between the different parts of speech emit lexical
+observations have proven reasonably accurate.
+To explore the exact nature of the efficacy of HMMs in POS tagging and what further
+augmentations might prove beneficial, a HMM model was built from scratch, trained,
+tested, and refined in the \emph{COSC 6336 Part-of-Speech Tagging with HMM} competition
+on \texttt{competitions.codalab.org} under the user handle \texttt{ghostant}.
 
 \section{Methodology}
 
