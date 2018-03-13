@@ -146,7 +146,7 @@ To gauge efficacy of the tagger during development and enable rapid prototyping,
 a rough measure of precision was taken via the following shell command:
 
 \begin{alltt}
-  \tiny{diff dev.conll <output file> | egrep '<' | wc -l}
+  {\tiny diff dev.conll <\emph{output file}> | egrep '<' | wc -l}
 \end{alltt}
 
 \paragraph{}
@@ -155,38 +155,33 @@ All development testing prior to submission was done with the provided
 Submissions to the competition were only trained with \texttt{train.conll}.
 
 \paragraph{Refinements}
-After the first pass of the tagger pipeline was completed, it was clear that it would
-not be able to compete effectively on its own. Rough estimates of precision from
-initial assays against \texttt{dev.conll} ran around 0.81, which was below the
-Naive Bayes competition submission made by the user blackbishop.
-Incorporating some of the ideas expressed by Dr. Solorio during lecture on February, 28, 2018,
-a heuristic fallback step was introduced in the decoding phase for unknown vocabulary.
+The first pass of the tagger pipeline revealed that it would not be able to compete effectively on its own.
+Rough estimates of precision from initial assays against \texttt{dev.conll} ran around 0.81, below the
+Naive Bayes competition baseline. It was noticed that many clearly nominal or
+verbal tokens were being labeled as \texttt{PUNCT}, so a heuristic fallback step was
+introduced in the decoding phase for unknown vocabulary. It employed regular expressions
+to capture whether the unigram in the emission was capitalized, contained only punctuation
+marks, or only alphanumeric characters. For capitalized unigrams, the fallback emission
+probability was zeroed out for every class except \texttt{PROPN}. For
+punctuation-only unigrams, the fallback emission probability was zeroed out for every
+class except \texttt{PUNCT}. For alphanumeric-only unigrams,
+the fallback emission probabilities for $P(word|\texttt{PUNCT})$ and $P(word|\texttt{SYM})$
+were zeroed out.
 
 \paragraph{}
-The heuristic fallback employed regular expressions to capture whether the unigram
-in the emission was capitalized, contained only punctuation marks, or only alphanumeric
-characters. In the capitalization case, the fallback emission probability was zeroed out
-for every class except \texttt{PROPN}. In the case where only punctuation marks were
-present, the fallback emission probability was zeroed out for every class except
-\texttt{PUNCT}. In the case where only alphanumeric characters were present, the fallback
-emission probabilities for $P(word|\texttt{PUNCT})$ and $P(word|\texttt{SYM})$ were
-zeroed out.
+The refinement performed as expected, raising the correctness of the output, if not
+perfectly preserving the probability masses involved. Taking a cue from Brants et al.
+in their development of \emph{stupid backoff} \shortcite[859-860]{LLMinMT}, this was deemed
+an acceptable sacrifice. Unfortunately, adding this refinement also incurred a massive
+performance penalty since the series of branching if-statements became quadratic with
+respect to $Q$, the set of possible generating POS states.
 
 \paragraph{}
-This simple heuristic check was done as it was noticed that many clearly nominal or
-verbal tokens were being labeled as \texttt{PUNCT}. The refinement performed as expected,
-raising the correctness of the output, if not perfectly preserving the probability masses
-involved. Adding this refinement also incurred a massive performance penalty since
-the series of branching if-statements became quadratic with respect to $Q$, the set
-of possible generating POS states.
-
-\paragraph{}
-After the addition of heuristic fallback, attention was turned to combining the
-emission probabilities of different orders of n-grams. Two modes of operation were
-implemented to achieve this: backoff and interpolation \cite[49-50]{JurafskyMartin}.
-The backoff mode simply backed off to increasingly lower orders of n-grams from the
-highest order stored by the model until it reached the unigram order.
-If the model had not seen the token, it would fall back to a special unknown token
+Attention then turned to combining the emission probabilities of different orders of n-grams.
+Two modes of operation were implemented to achieve this: backoff and interpolation \cite[49-50]{JurafskyMartin}.
+The backoff mode simply deferred to increasingly lower orders of n-grams from the
+highest order stored by the model until reaching the unigram order.
+If the model had not seen the token, it would fall back to a special token
 encoded as \texttt{<UNK>} that had been seeded with smoothed probabilities if one
 of the heuristic fallback cases did not apply.
 
@@ -194,23 +189,22 @@ of the heuristic fallback cases did not apply.
 The interpolation mode was implemented in a rudimentary fashion. The highest order n-gram
 would receive a weight of 0.5, the (n-1)-gram would receive half of the remaining weight,
 and so on until the unigram observation. If any of the n-grams had not been seen, its
-contribution would fall back to the heuristic fallback unigram of \texttt{<UNK>}.
+contribution would defer to the heuristic fallback unigram of \texttt{<UNK>}.
 At the beginnings of sentences and in sentences shorter than the highest order n-gram
 in the model, no phantom n-grams were computed. The interpolation chain would start with
 the longest observed n-gram and apply the formula in the same manner.
 
 \paragraph{}
 An issue was encountered in the dev set with a sentence composed of 91 tokens. A numerical
-underflow in the multiplication of probabilities during the decoding phase led to a state
-where the backpointers could not be traversed since they would only be assigned if a
-preceding state had greater than zero probability, the initial value of the $a_{max}$
-cursor. To counter this, a major refactoring of the code was done to store and use
-the logarithm of the various probabilities calculated and multiplication operations
-were changed to addition. To provide the same effect in log space, the value zero
-was replaced with $-\texttt{sys.float\_info.max}$.
+underflow in probability multiplication led to a state where the backpointers could not be
+traversed since they would only be assigned if a preceding state had greater than zero
+probability, the initial value of the $a_{max}$ cursor. To counter this, a major refactoring
+of the code was done to store and use the logarithm of the various probabilities calculated
+and multiplication operations were changed to addition. To provide the same effect in log
+space, the value zero was replaced with $-\texttt{sys.float\_info.max}$.
 
 \paragraph{}
-Since the abysmal execution speed  of the heuristic fallback put a drag on development time,
+Since the poor execution speed of the heuristic fallback put a drag on development time,
 the heuristic intuitions were integrated earlier in the pipeline by preseeding the
 emission probabilities that corresponded to the various heuristic checks. Three
 heuristic check responses were encoded in each observation key, and the regular
@@ -306,6 +300,145 @@ methods are not employed, but using the weighted interpolation
 with a small $k$ constant seems to minimize the occurrence of
 false positives.
 
+{\center\footnotesize Micro-averaged Precision\\}
+{\tiny\pgfplotstabletypeset[header=true]{\pmicro}}
+
+Conversely, the macro-averaged precision values are significantly lower.
+The holistic precision of the system may be well-suited to the task
+and particularly the training and dev sets, but these results suggest
+that a few predominant classes in which the system performs well
+are masking the poor performance in the case of less frequently occurring
+POS tags.
+
+{\center\footnotesize Macro-averaged Precision\\}
+{\tiny\pgfplotstabletypeset[header=true]{\pmacro}}
+
+\paragraph{Recall}
+The results for micro-averaged recall approximate the
+results observed for micro-averaged precision. Taken as a
+whole, the system does not seem to be excessively prone to
+false negatives.
+
+
+{\center\footnotesize Micro-averaged Recall\\}
+{\tiny\pgfplotstabletypeset[header=true]{\rmicro}}
+
+Once again, however, the macro-averaged recall indicates
+that there are certain underrepresented classes where the
+occurrence of false negatives is high.
+
+{\center\footnotesize Macro-averaged Recall\\}
+{\tiny\pgfplotstabletypeset[header=true]{\rmacro}}
+
+\paragraph{Accuracy}
+No distinction is made between micro-averaging and macro-averaging
+of accuracy since the results are mathematically the same.
+
+{\center\footnotesize Accuracy\\}
+{\tiny\pgfplotstabletypeset[header=true]{\amicro}}
+
+The results observed here appear superficially impressive,
+but the abnormally high values point to an overfitting in the model.
+This becomes immediately apparent when one compares the individual
+values of the accuracy in the different classes. For instance,
+the \texttt{PUNCT} class boasts of accuracy measures as high
+as 0.9997 with heuristic provisions, but only 0.8782 without
+fallback or preseeding. And yet, the overall accuracy even without
+heuristic support is well above the 97th percentile in all cases.
+The empirical results here corroborate Jurafsky and Martin \shortcite[83-84]{JurafskyMartin}
+in decrying accuracy as a useful statistic.
+
+\paragraph{$F_{1}$-Measure}
+
+Since $F$-measure is a function of precision and recall, the results are
+similar for those observed for precision and recall but are included
+here for completeness. It succinctly captures in one measure the
+inherent weaknesses of the model.
+
+{\center\footnotesize Micro-averaged $F_{1}$-measure\\}
+{\tiny\pgfplotstabletypeset[header=true]{\fmicro}}
+
+{\center\footnotesize Macro-averaged $F_{1}$-measure\\}
+{\tiny\pgfplotstabletypeset[header=true]{\fmacro}}
+
+
+\section{Conclusions}
+
+While the system performed relatively favorably in the competition,
+the faults in the system strongly recommend a refactoring of certain
+components. The small training set size commended itself to the
+use of heuristics, but better performance on a purely probabilistic
+basis might have been achieved with more comprehensive training data.
+A more rigorous examination of the proper redistribution of probability
+mass is required at a minimum.
+
+\paragraph{}
+Until the final refinements, the system was most precise with an
+observation order of 1, i.e., with unigrams. The original expectation
+was that increasing the observation order would increase the precision
+of the system, but the sparsity of the higher-order n-grams may have
+rendered increasing the order parameter of the model useless except
+for all but the most common idioms.
+
+\paragraph{}
+It was observed that decreasing the $k$ smoothing constant increased precision during development,
+but the strategy may not apply in cases with a large unknown vocabulary. The equiprobable
+distribution engendered by naive add-$k$ smoothing fails to reflect actual
+distribution of POS tags in a given language, demanding the addition
+of heuristic support. A more sophisticated approach using a held-out
+corpus to more realistically weight unknown vocabulary would likely yield better results.
+By the same token, interpolation could have been improved by determining weights
+from a cross-validated battery of tests against a collection of held-out corpora rather
+than the simple iterative remainder method that was employed.
+
+\paragraph{}
+Furthermore, future efforts would likely do well to attempt a morphological deconstruction
+of observations during training since lexemes are not necessarily atomic. Key components
+of function are encoded in all manners of inflection which could be leveraged to provide
+more granular feature determination.
+
+\paragraph{}
+For all of the issues with the implementation as presented, there is an even more
+fundamental weakness in the HMM approach in general. The Markov assumption that
+the probability of a whole sequence can be estimated by immediate predecessors
+fails to account for situations in which subsequent context determines the syntactic
+relationship of words heretofore, such as in languages that employ postpositions,
+or situations in which vital antecedent context precedes the current state by more
+than what may be economical to store, such as in topic-prominent languages.
+
+\paragraph{}
+To this end, it may be worthwhile to investigate strategies that employ lookahead tactics
+like skip-grams or to transfer the encoding of language ID into the state transition matrix
+rather than the observation matrix to more readily account for cases in which the syntax of
+the two or more languages in a code-switched corpus follow a different transitional graph,
+such as the adjective-noun noun-adjective dichotomy between English and Spanish.
+Enriching the POS transition graph may even yield some insights, at least on a syntactic
+level, into the nature of code-switching itself.
+
+\section*{Acknowledgments}
+
+The author wishes to acknowledge Dr. Thamar Solorio for heuristic feature suggestions in
+lecture on February 28, 2018; the NAACL template authors for providing a ready-made
+{\LaTeX} template; and Dr. Daniel Jurafsky and Dr. James H. Martin for succinctly laying out the
+properties and implementation of hidden Markov Models in the 3rd edition draft of their
+text \emph{Speech and Language Processing}. The author further wishes to acknowledge
+Dorothea Yantosca for her indispensable design criticism on the graphs and tables
+which appear in this paper.
+
+\bibliography{yantosca_COSC6336_assg_1}
+\bibliographystyle{acl_natbib}
+
+\appendix
+
+\section{Supplemental Material}
+\label{sec:supplemental}
+
+\paragraph{}
+
+Bar graphs corresponding to the tables given in the body of the paper are given
+here as a quick visual reference. For those interested in the raw data from the
+experiment that informed the tables and graphs, please contact the author via e-mail.
+
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
@@ -330,15 +463,6 @@ false positives.
     \addlegendentry{wnh};
   \end{axis}
 \end{tikzpicture}
-
-{\tiny\pgfplotstabletypeset[header=true]{\pmicro}}
-
-Conversely, the macro-averaged precision values are significantly lower.
-The holistic precision of the system may be well-suited to the task
-and particularly the training and dev sets, but these results suggest
-that a few predominant classes in which the system performs well
-are masking the poor performance in the case of less frequently occurring
-POS tags.
 
 \begin{tikzpicture}
   \begin{axis}
@@ -365,14 +489,6 @@ POS tags.
   \end{axis}
 \end{tikzpicture}
 
-{\tiny\pgfplotstabletypeset[header=true]{\pmacro}}
-
-\paragraph{Recall}
-The results for micro-averaged recall approximate the
-results observed for micro-averaged precision. Taken as a
-whole, the system does not seem to be excessively prone to
-false negatives.
-
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
@@ -397,12 +513,6 @@ false negatives.
     \addlegendentry{wnh};
   \end{axis}
 \end{tikzpicture}
-
-{\tiny\pgfplotstabletypeset[header=true]{\rmicro}}
-
-Once again, however, the macro-averaged recall indicates
-that there are certain underrepresented classes where the
-occurrence of false negatives is high.
 
 \begin{tikzpicture}
   \begin{axis}
@@ -429,57 +539,31 @@ occurrence of false negatives is high.
   \end{axis}
 \end{tikzpicture}
 
-{\tiny\pgfplotstabletypeset[header=true]{\rmacro}}
-
-\paragraph{Accuracy}
-No distinction is made between micro-averaging and macro-averaging
-of accuracy since the results are mathematically the same.
-
 \begin{tikzpicture}
   \begin{axis}
-    [ ybar,
+    [ xbar,
       bar width=0.0625,
       legend style={at={(0.5,-0.15)},
         anchor=north,legend columns=-1},
-      xtick=data,
+      ytick=data,
       point meta=explicit symbolic,
-      title=Accuracy
+      title={\footnotesize Accuracy}
     ]
-    \addplot table [x=n,y=bfb,meta=k] {\amicro};
+    \addplot table [y=n,x=bfb,meta=k] {\amicro};
     \addlegendentry{bfb};
-    \addplot table [x=n,y=bps,meta=k] {\amicro};
+    \addplot table [y=n,x=bps,meta=k] {\amicro};
     \addlegendentry{bps};
-    \addplot table [x=n,y=bnh,meta=k] {\amicro};
+    \addplot table [y=n,x=bnh,meta=k] {\amicro};
     \addlegendentry{bnh};
-    \addplot table [x=n,y=wfb,meta=k] {\amicro};
+    \addplot table [y=n,x=wfb,meta=k] {\amicro};
     \addlegendentry{wfb};
-    \addplot table [x=n,y=wps,meta=k] {\amicro};
+    \addplot table [y=n,x=wps,meta=k] {\amicro};
     \addlegendentry{wps};
-    \addplot table [x=n,y=wnh,meta=k] {\amicro};
+    \addplot table [y=n,x=wnh,meta=k] {\amicro};
     \addlegendentry{wnh};
   \end{axis}
 \end{tikzpicture}
 
-{\tiny\pgfplotstabletypeset[header=true]{\amicro}}
-
-The results observed here appear superficially impressive,
-but the abnormally high values point to an overfitting in the model.
-This becomes immediately apparent when one compares the individual
-values of the accuracy in the different classes. For instance,
-the \texttt{PUNCT} class boasts of accuracy measures as high
-as 0.9997 with heuristic provisions, but only 0.8782 without
-fallback or preseeding. And yet, the overall accuracy even without
-heuristic support is well above the 97th percentile in all cases.
-The empirical results here corroborate Jurafsky and Martin \shortcite[83-84]{JurafskyMartin}
-in decrying accuracy as a useful statistic.
-
-\paragraph{$F_{1}$-Measure}
-
-Since $F$-measure is a function of precision and recall, the results are
-similar for those observed for precision and recall but are included
-here for completeness. It succinctly captures in one measure the
-inherent weaknesses of the model.
-
 \begin{tikzpicture}
   \begin{axis}
     [ ybar,
@@ -488,7 +572,7 @@ inherent weaknesses of the model.
         anchor=north,legend columns=-1},
       xtick=data,
       point meta=explicit symbolic,
-      title=F1 Measure (Micro-averaged)
+      title={\footnotesize Micro-averaged $F_{1}$ Measure}
     ]
     \addplot table [x=n,y=bfb,meta=k] {\fmicro};
     \addlegendentry{bfb};
@@ -505,7 +589,6 @@ inherent weaknesses of the model.
   \end{axis}
 \end{tikzpicture}
 
-{\tiny\pgfplotstabletypeset[header=true]{\fmicro}}
 
 \begin{tikzpicture}
   \begin{axis}
@@ -515,7 +598,7 @@ inherent weaknesses of the model.
         anchor=north,legend columns=-1},
       xtick=data,
       point meta=explicit symbolic,
-      title=F1 Measure (Macro-averaged)
+      title={\footnotesize Macro-averaged $F_{1}$ Measure}
     ]
     \addplot table [x=n,y=bfb,meta=k] {\fmacro};
     \addlegendentry{bfb};
@@ -531,80 +614,5 @@ inherent weaknesses of the model.
     \addlegendentry{wnh};
   \end{axis}
 \end{tikzpicture}
-
-{\tiny\pgfplotstabletypeset[header=true]{\fmacro}}
-
-\section{Conclusions}
-
-While the system performed relatively favorably in the competition,
-the faults in the system strongly recommend a refactoring of certain
-key components. The small training set size commended itself to the
-use of heuristics, but better performance on a purely probabilistic
-basis might have been achieved with a more comprehensive set of
-training data. A more rigorous examination of the proper redistribution
-of probability mass is required at a minimum.
-
-\paragraph{}
-Until the final refinements, the system was most precise with an
-observation order of 1, i.e., with unigrams. The original expectation
-was that increasing the observation order would increase the precision
-of the system, but the sparsity of the higher-order n-grams may have
-rendered increasing the order parameter of the model useless except
-for all but the most common idioms.
-
-\paragraph{}
-It was observed that decreasing the $k$ smoothing constant increased
-precision in the scenarios tested during development, but the strategy
-may not apply in cases with a large unknown vocabulary. The equiprobable
-distribution engendered by naive add-k smoothing does not reflect the actual
-distribution of POS tags in a given language and necessitated the addition
-of heuristic support. A more sophisticated approach to smoothing using a held-out
-corpus to determine a more realistic distribution for unknown vocabulary
-would likely yield better results with less semi-manual intervention.
-By the same token, interpolation could have been improved by determining weights
-from an empirically derived and cross-validated battery of tests against a collection
-of held-out corpora rather than the simple iterative remainder method that was employed.
-
-\paragraph{}
-Furthermore, future efforts would likely do well to attempt a morphological deconstruction
-of observations during training since lexemes are not necessarily atomic. Key components
-of function are encoded in all manners of inflection which could be leveraged to provide
-more granular feature determination.
-
-\paragraph{}
-For all of the issues with the implementation as presented, there is an even more
-fundamental weakness in the HMM approach in general. The Markov assumption that
-the probability of a whole sequence can be estimated by immediate predecessors
-fails to account for situations in which subsequent context determines the syntactic
-relationship of words heretofore, such as in languages that employ postpositions,
-or situations in which vital antecedent context precedes the current state by more
-than what may be economical to store, such as in topic-prominent languages.
-
-\paragraph{}
-To this end, it may be worthwhile to investigate strategies that employ lookahead tactics
-like skip-grams or to transfer the encoding of language ID into the state transition matrix
-rather than the observation matrix to more readily account for cases in which the syntax of
-the two or more languages in a code-switched corpus follow a different transitional graph,
-such as the adjective-noun noun-adjective dichotomy between English and Spanish.
-Enriching the POS transition graph may even yield some insights, at least on a syntactic
-level into the nature of code-switching itself.
-
-\section*{Acknowledgments}
-
-The author wishes to acknowledge Dr. Thamar Solorio for heuristic feature suggestions in
-lecture on February 28, 2018; the NAACL template authors for providing a ready-made
-{\LaTeX} template; and Dr. Daniel Jurafsky and Dr. James H. Martin for succinctly laying out the
-properties and implementation of hidden Markov Models in the 3rd edition draft of their
-text \emph{Speech and Language Processing}. The author further wishes to acknowledge
-Dorothea Yantosca for her indispensable design criticism on the graphs and tables
-which appear in this paper.
-
-\bibliography{yantosca_COSC6336_assg_1}
-\bibliographystyle{acl_natbib}
-
-\appendix
-
-\section{Supplemental Material}
-\label{sec:supplemental}
 
 \end{document}
